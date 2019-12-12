@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+<title>xarkes' blog</title>
+<link>https://xarkes.com/b</link>
+<description></description>
+<language>en-us</language>
+<lastBuildDate>Fri, 13 Dec 2019 00:00:00 +0000</lastBuildDate>
+<item>
+<title>Hack.lu 2019 - Baby Kernel 2 writeup</title>
+<link>https://xarkes.com/b/hacklu-2019-babykernel-wu.html</link>
+<description>
+<p>Last october, I participated to <a href="https://2019.hack.lu/">Hack.lu</a> Capture The Flag with my team
+<a href="https://securimag.org/">Securimag</a>.</p>
+<p>I did this writeup as all the ones I've read do not explain how they managed to reliably find the offset of <code>real_cred</code> in the <code>current_task</code> structure.</p>
+
+<br/>
+<p>
+<a href="https://xarkes.com/b/hacklu-2019-babykernel-wu.html">Read more at https://xarkes.com/b/hacklu-2019-babykernel-wu.html</a>
+</p>
+</description>
+<pubDate>Mon, 09 Dec 2019 00:00:00 +0000</pubDate>
+</item>
+
+</channel>
+</rss>

