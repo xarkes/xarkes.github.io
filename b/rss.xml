@@ -8,6 +8,23 @@
 <language>en-us</language>
 <lastBuildDate>Thu, 26 Dec 2019 00:00:00 +0000</lastBuildDate>
 <item>
+<title>Advent 2019 - Genetic Mutation writeup (First Blood)</title>
+<link>https://xarkes.com/b/advent-2019-Genetic-Mutation-First-Blood.html</link>
+<description><![CDATA[
+This month, I took a glance at <a href="https://overthewire.org">Over The Wire</a>
+<a href="https://advent2019.overthewire.org">advent CTF</a>
+with some of my teammates of <a href="https://securimag.org">Securimag</a>.
+The challenge was asking for at most 4 bytes to patch and I found it sufficient
+to exploit not the binary itself but rather the <code>exec</code> function. I don't know
+if that was the intended way, but it was quick enough to pop a shell and get the
+first blood.
+<a href="https://xarkes.com/b/advent-2019-Genetic-Mutation-First-Blood.html">Read more at https://xarkes.com/b/advent-2019-Genetic-Mutation-First-Blood.html</a>
+]]></description>
+<dc:creator>xarkes</dc:creator>
+<guid isPermaLink="false">tag:xarkes.com,/b/advent-2019-Genetic-Mutation-First-Blood.html</guid>
+<pubDate>Thu, 26 Dec 2019 00:00:00 +0000</pubDate>
+</item>
+<item>
 <title>Hack.lu 2019 - Baby Kernel 2 writeup</title>
 <link>https://xarkes.com/b/hacklu-2019-babykernel-wu.html</link>
 <description><![CDATA[
