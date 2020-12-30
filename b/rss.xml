@@ -6,7 +6,23 @@
 <link>https://xarkes.com/b/</link>
 <description></description>
 <language>en-us</language>
-<lastBuildDate>Sun, 11 Oct 2020 00:00:00 +0000</lastBuildDate>
+<lastBuildDate>Wed, 30 Dec 2020 00:00:00 +0000</lastBuildDate>
+<item>
+<title>Making a Lineage 2 Bot</title>
+<link>https://xarkes.com/b/making-a-lineage-2-bot.html</link>
+<description><![CDATA[
+A few months ago I got nostalgic and wanted to try again a little bit of Lineage 2.
+In the past most servers were filled with tons of bots that would farm
+in order to either level up, gain money or loot materials useful for crafting equipment.
+The working and available bots are all non-free (to my knowledge) and most of them are detected by the remote servers as cheating tools!
+So I decided to make my own bot as I thought the process would be interesting.
+This blog post presents my approach at making my own bot for Lineage II.
+<a href="https://xarkes.com/b/making-a-lineage-2-bot.html">Read more at https://xarkes.com/b/making-a-lineage-2-bot.html</a>
+]]></description>
+<dc:creator>xarkes</dc:creator>
+<guid isPermaLink="false">tag:xarkes.com,/b/making-a-lineage-2-bot.html</guid>
+<pubDate>Wed, 30 Dec 2020 00:00:00 +0000</pubDate>
+</item>
 <item>
 <title>SSTIC 2020 - Challenge writeup (French)</title>
 <link>https://xarkes.com/b/sstic-2020-challenge.html</link>
