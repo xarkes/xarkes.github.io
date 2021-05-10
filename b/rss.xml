@@ -6,7 +6,20 @@
 <link>https://xarkes.com/b/</link>
 <description></description>
 <language>en-us</language>
-<lastBuildDate>Tue, 04 May 2021 12:49:52 +0200</lastBuildDate>
+<lastBuildDate>Mon, 10 May 2021 20:16:54 +0200</lastBuildDate>
+<item>
+<title>DEFCON quals 2021 - Exploit for dummies</title>
+<link>https://xarkes.com/b/defcon-quals-2021-exploit-for-dummies.html</link>
+<description><![CDATA[
+Around 10 days ago was <a href="https://oooverflow.io/dc-ctf-2021-quals/">DEFCON qualifiers</a> and I had a chance to take a look at the challenges.
+My eyes stopped on "Exploit for dummies" as I recognised myself in the term "dummy" and hoped I could solve this one.
+The challenge was marked as "shellcoding" and believe it or not it will deal with <a href="https://en.wikipedia.org/wiki/DWARF">DWARF</a> debugging data format.
+<a href="https://xarkes.com/b/defcon-quals-2021-exploit-for-dummies.html">Read more at https://xarkes.com/b/defcon-quals-2021-exploit-for-dummies.html</a>
+]]></description>
+<dc:creator>xarkes</dc:creator>
+<guid isPermaLink="false">tag:xarkes.com,/b/defcon-quals-2021-exploit-for-dummies.html</guid>
+<pubDate>Mon, 10 May 2021 20:12:50 +0200</pubDate>
+</item>
 <item>
 <title>FCSC 2021 - The Offenders writeup</title>
 <link>https://xarkes.com/b/fcsc-2021-the-offenders.html</link>
