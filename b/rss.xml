@@ -2,13 +2,31 @@
 <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
 <atom:link href="https://xarkes.com/b/rss.xml" rel="self" type="application/rss+xml"/>
-<title>xarkes' blog</title>
+<title>Xarkes' Blog</title>
 <link>https://xarkes.com/b/</link>
 <description></description>
 <language>en-us</language>
-<lastBuildDate>Sun, 23 May 2021 16:10:33 +0200</lastBuildDate>
+<lastBuildDate>Wed, 02 Jun 2021 22:08:15 +0200</lastBuildDate>
 <item>
-<title>DEFCON quals 2021 - Exploit for dummies</title>
+<title>Fetching GitHub pull requests with git</title>
+<link>https://xarkes.com/b/git-fetching-github-pull-requests.html</link>
+<description><![CDATA[
+I often need to fetch a pending Pull Request (PR) from GitHub in order to try a project locally before merging the PR, and although I manage
+to find the commands in my history, I never remember the commands.
+It's rather simple, given that the remote named <code>origin</code> is the one from GitHub, <code>1234</code> is your PR number (from GitHub URL, or PR title) and that
+you want to fetch it under a branch named <code>custom_feature</code>:
+<div class="codehilite"><pre><span></span><code>git fetch origin pull/1234/head:custom_feature
+git checkout custom_feature
+</code></pre></div>
+I hope I'll remember now!
+<a href="https://xarkes.com/b/git-fetching-github-pull-requests.html">Read more at https://xarkes.com/b/git-fetching-github-pull-requests.html</a>
+]]></description>
+<dc:creator>xarkes</dc:creator>
+<guid isPermaLink="false">tag:xarkes.com,/b/git-fetching-github-pull-requests.html</guid>
+<pubDate>Wed, 02 Jun 2021 22:09:11 +0200</pubDate>
+</item>
+<item>
+<title>DEFCON quals 2021 - Exploit for dummies challenge writeup</title>
 <link>https://xarkes.com/b/defcon-quals-2021-exploit-for-dummies.html</link>
 <description><![CDATA[
 Around 10 days ago was <a href="https://oooverflow.io/dc-ctf-2021-quals/">DEFCON qualifiers</a> and I had a chance to take a look at the challenges.
@@ -21,7 +39,7 @@ The challenge was marked as "shellcoding" and believe it or not it will deal wit
 <pubDate>Mon, 10 May 2021 20:12:50 +0200</pubDate>
 </item>
 <item>
-<title>FCSC 2021 - The Offenders writeup</title>
+<title>FCSC 2021 - The Offenders reverse engineering challenge writeup</title>
 <link>https://xarkes.com/b/fcsc-2021-the-offenders.html</link>
 <description><![CDATA[
 In the context of the <a href="https://ecsc.eu/">European Cyber Security Challenge</a> the <a href="https://en.wikipedia.org/wiki/Agence_nationale_de_la_s%C3%A9curit%C3%A9_des_syst%C3%A8mes_d%27information">ANSSI</a> organised qualifications named <a href="https://france-cybersecurity-challenge.fr/">FCSC</a> in order to select the team that would represent France.
@@ -34,7 +52,7 @@ This writeup will show my quick and dirty way of solving it.
 <pubDate>Mon, 03 May 2021 18:02:23 +0200</pubDate>
 </item>
 <item>
-<title>Making a Lineage 2 Bot</title>
+<title>Making an in-game Lineage 2 Bot</title>
 <link>https://xarkes.com/b/making-a-lineage-2-bot.html</link>
 <description><![CDATA[
 A few months ago I got nostalgic and wanted to try again a little bit of Lineage 2.
@@ -50,7 +68,7 @@ This blog post presents my approach at making my own bot for Lineage II.
 <pubDate>Wed, 30 Dec 2020 00:00:00 +0100</pubDate>
 </item>
 <item>
-<title>SSTIC 2020 - Challenge writeup (French)</title>
+<title>SSTIC 2020 - Challenge writeup</title>
 <link>https://xarkes.com/b/sstic-2020-challenge.html</link>
 <description><![CDATA[
 During the month of April I tried to solve the SSTIC challenge.
@@ -62,7 +80,7 @@ I managed to complete it eventually, and you can find my solution in french <a h
 <pubDate>Fri, 12 Jun 2020 00:00:00 +0200</pubDate>
 </item>
 <item>
-<title>Advent 2019 - Genetic Mutation writeup (First Blood)</title>
+<title>Advent 2019 - Genetic Mutation challenge writeup (First Blood)</title>
 <link>https://xarkes.com/b/advent-2019-Genetic-Mutation-First-Blood.html</link>
 <description><![CDATA[
 This month, I took a glance at <a href="https://overthewire.org">Over The Wire</a>
@@ -79,7 +97,7 @@ first blood.
 <pubDate>Thu, 26 Dec 2019 00:00:00 +0100</pubDate>
 </item>
 <item>
-<title>Hack.lu 2019 - Baby Kernel 2 writeup</title>
+<title>Hack.lu 2019 - Baby Kernel 2 challenge writeup</title>
 <link>https://xarkes.com/b/hacklu-2019-babykernel-wu.html</link>
 <description><![CDATA[
 Last october, I participated to <a href="https://2019.hack.lu/">Hack.lu</a> Capture The Flag with my team
