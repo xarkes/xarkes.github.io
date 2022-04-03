@@ -6,7 +6,22 @@
 <link>https://xarkes.com/b/</link>
 <description></description>
 <language>en-us</language>
-<lastBuildDate>Wed, 09 Jun 2021 23:16:30 +0200</lastBuildDate>
+<lastBuildDate>Sun, 03 Apr 2022 16:28:59 +0200</lastBuildDate>
+<item>
+<title>Pwn2Own Austin 2021 - Defeating the Netgear R6700v3</title>
+<link>https://xarkes.com/b/pwn2own-2021-netgear.html</link>
+<description><![CDATA[
+<a href="https://en.wikipedia.org/wiki/Pwn2Own">Pwn2Own</a> is a famous computer hacking contest which helds twice a year.
+It provides various targets for which hackers compete in order to hack them and get unprivileged access to it.
+It may feature industrial devices, routers, printers, smartphones or even cars and targets change for each event.
+With a coworker of mine we took a glance at the Netgear R6700v3 and this blogpost is a quick recap on what we did.
+You can read our complete writeup <a href="https://www.synacktiv.com/publications/pwn2own-austin-2021-defeating-the-netgear-r6700v3.html">here</a>.
+<a href="https://xarkes.com/b/pwn2own-2021-netgear.html">Read more at https://xarkes.com/b/pwn2own-2021-netgear.html</a>
+]]></description>
+<dc:creator>xarkes</dc:creator>
+<guid isPermaLink="false">tag:xarkes.com,/b/pwn2own-2021-netgear.html</guid>
+<pubDate>Sun, 03 Apr 2022 16:10:01 +0200</pubDate>
+</item>
 <item>
 <title>SSTIC 2021 - Challenge writeup</title>
 <link>https://xarkes.com/b/sstic-2021-challenge.html</link>
