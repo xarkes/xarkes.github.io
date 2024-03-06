@@ -6,21 +6,17 @@
 <link>https://xarkes.com/b/</link>
 <description></description>
 <language>en-us</language>
-<lastBuildDate>Sun, 03 Apr 2022 16:28:59 +0200</lastBuildDate>
+<lastBuildDate>Wed, 06 Mar 2024 20:07:01 +0100</lastBuildDate>
 <item>
-<title>Pwn2Own Austin 2021 - Defeating the Netgear R6700v3</title>
-<link>https://xarkes.com/b/pwn2own-2021-netgear.html</link>
+<title>Avoiding TLS certificate leakage with Nginx</title>
+<link>https://xarkes.com/b/nginx-tls-certificate-leakage.html</link>
 <description><![CDATA[
-<a href="https://en.wikipedia.org/wiki/Pwn2Own">Pwn2Own</a> is a famous computer hacking contest which helds twice a year.
-It provides various targets for which hackers compete in order to hack them and get unprivileged access to it.
-It may feature industrial devices, routers, printers, smartphones or even cars and targets change for each event.
-With a coworker of mine we took a glance at the Netgear R6700v3 and this blogpost is a quick recap on what we did.
-You can read our complete writeup <a href="https://www.synacktiv.com/publications/pwn2own-austin-2021-defeating-the-netgear-r6700v3.html">here</a>.
-<a href="https://xarkes.com/b/pwn2own-2021-netgear.html">Read more at https://xarkes.com/b/pwn2own-2021-netgear.html</a>
+TL;DR: Having a Nginx configuration file with <code>server_name _;</code> is not enough for it to match any not supported domain name. Always properly configure a fallback method with a self-signed certificate not leaking any personal data and make sure it is loaded first as the loading order of configuration files matters. For instance move it to <code>/etc/nginx/sites-enabled/0_default</code> and make sure no other server block configuration is loaded first.
+<a href="https://xarkes.com/b/nginx-tls-certificate-leakage.html">Read more at https://xarkes.com/b/nginx-tls-certificate-leakage.html</a>
 ]]></description>
 <dc:creator>xarkes</dc:creator>
-<guid isPermaLink="false">tag:xarkes.com,/b/pwn2own-2021-netgear.html</guid>
-<pubDate>Sun, 03 Apr 2022 16:10:01 +0200</pubDate>
+<guid isPermaLink="false">tag:xarkes.com,/b/nginx-tls-certificate-leakage.html</guid>
+<pubDate>Wed, 06 Mar 2024 00:00:00 +0100</pubDate>
 </item>
 <item>
 <title>SSTIC 2021 - Challenge writeup</title>
