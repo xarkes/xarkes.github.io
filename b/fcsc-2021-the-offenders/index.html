@@ -1,0 +1,99 @@
+<!doctype html><html lang=en><head><title>FCSC 2021 - The Offenders reverse engineering challenge writeup</title><meta charset=UTF-8><meta content="width=device-width,initial-scale=1.0" name=viewport><link href=/fonts.css rel=stylesheet><link href=/style.css rel=stylesheet><body><main><nav><ul><li><a href=/>/index</a><li><a href=/b/>/blog</a><li><a href=https://github.com/xarkes>/github</a><li><a href=https://x.com/xarkes_>/x</a></ul></nav><div><h1>FCSC 2021 - The Offenders reverse engineering challenge writeup</h1><p><strong>Published on 2021-05-03</strong><p>In the context of the <a href=https://ecsc.eu/>European Cyber Security Challenge</a> the <a href=https://en.wikipedia.org/wiki/Agence_nationale_de_la_s%C3%A9curit%C3%A9_des_syst%C3%A8mes_d%27information>ANSSI</a> organised qualifications named <a href=https://france-cybersecurity-challenge.fr/>FCSC</a> in order to select the team that would represent France. I managed to take a look at some challenges, in particular "The Offenders" which deals about Windows Defender. This writeup will show my quick and dirty way of solving it.</p><span id=continue-reading></span><h2 id=overview>Overview</h2><p>The challenge provides us a <code>PE32+</code> executable and explains it was found on VirusTotal and expects to be run by Windows Defender.<p>After opening the executable in a decompiler, I observed that the main function does the following:<ol><li>Fetches names for some running processes<li>Fetches files from the filesystem (e.g. <code>C:\mirc\mirc.ini</code>)<li>Fetches some Windows registry keys</ol><p>Then it mixes the data altogether and finally xor it with the string <code>INPUTINPUTINPUTINPUTINPUTINPU</code> and then xor it again with some constants. Finally, if the input data (originally <code>INPUTINPUT...</code>) starts with <code>FCSC{</code> and the resulting data of the previous operations is equal to the string <code>"Reminder: patch CVE-2021-1647"</code>, then it will create a file and write <code>Congratz</code> inside.<p>Thus we have the following equation:<pre style=color:#c0c5ce;background-color:#2b303b><code><span>fingerprint ^ input ^ constants = cve_string
+</span></code></pre><p>From what we've seen, we know <code>input</code> should contain the flag, so if we can manage to get the fingerprinting data, we can retrieve the flag thanks to the nature of the xor operation:<pre style=color:#c0c5ce;background-color:#2b303b><code><span>input = cve_string ^ constants ^ fingerprint
+</span></code></pre><p>From there I tried to think of the fastest way to solve this (i.e. to retrieve the <code>fingerprint</code> information) and it seemed obvious to me that we would have to dump it from a Windows Defender process.<h2 id=executing-windows-defender>Executing Windows Defender</h2><p>When looking around on the internet, we can see that <a href=https://twitter.com/taviso>Tavis Ormandy</a> made a tool <a href=https://github.com/taviso/loadlibrary>mpclient</a> which allows us to debug the Windows Defender engine (<code>mpengine.dll</code>) from a Linux environment. This sounds pretty cool, and after reading the readme we can start downloading a <code>mpam-fe.exe</code> file from Microsoft website and extract it to retrieve an up-to-date <code>mpengine.dll</code> with a few <code>.vdm</code> files which are required by mpclient.<p>But how does Windows Defender work after all? The talk <a href=https://i.blackhat.com/us-18/Thu-August-9/us-18-Bulazel-Windows-Offender-Reverse-Engineering-Windows-Defenders-Antivirus-Emulator.pdf>Windows Offender: Reverse Engineering Windows Defender's Antivirus Emulator</a> from <a href=https://twitter.com/0xAlexei>Alexei Bulazel</a> teaches us that Windows Defender will (among a lot of others things - by the way, you should really watch the <a href="https://www.youtube.com/watch?v=wDNQ-8aWLO0">talk</a>) emulate the executable it analyses.<p>The strategy I had in mind at this point was to select a specific instruction that is easily recognisable and not executed often, put a breakpoint in Windows Defender's emulation of that instruction, patch our <code>the_offenders.exe</code> binary to insert this instruction right after the fingerprinting, and finally dump the content from memory.<p>In order to analyse the <code>mpengine.dll</code> and find the proper instruction handler to break to, it would be very helpful to have symbols. However the latest downloaded <code>mpengine.dll</code> did not have any public symbols on Microsoft Servers.<p>Thanks to <a href=https://web.archive.org/>Web Archive</a> I was however able to download an older version of <code>mpam-fe.exe</code> that would give me an <code>mpengine.dll</code> with its <code>.vdm</code> files so that I can execute it with <code>mpclient</code> and also have the <code>.pdb</code> debug information file from Microsoft Servers. Here is the link for Windows Defender 1.321.1276.0 (engine 1.1.17300.4) from August 2020: <a href=http://web.archive.org/web/20200813073837if_/https://definitionupdates.microsoft.com/download/DefinitionUpdates/VersionedSignatures/AM/1.321.1276.0/x86/mpam-fe.exe>web archive definitionsupdates.microsoft.com</a>.<h2 id=breaking-at-the-right-spot>Breaking at the right spot</h2><p>I arbitrarily decided to use the <code>cpuid</code> instruction as I knew it wouldn't be executed often.<p><img alt="Windows Defender CPUID's emulation function" src=/img/windows_defender_cpuid_emulation.png><p>The above picture shows the function responsible for emulating CPUID in <code>mpengine.dll</code>. From this context we can understand it will check the emulated binary <code>rax</code> register with the various parameters the <a href=https://www.felixcloutier.com/x86/cpuid>CPUID</a> instruction takes into account. Note that <code>mpclient</code> runs only in 32 bits with a 32 bits version of <code>mpengine.dll</code>, but Windows Defender can emulate various architectures so it's not a problem that our binary <code>the_offenders.exe</code> is a x64 binary. This value is loaded from <code>esi+0x130</code>. With a bit of luck, this is the location where all the emulated registers are.<p>We can confirm this by putting a breakpoint in <code>mpengine.dll</code> while executing it with <code>mpclient</code> at the location of the CPUID emulation. We patch <code>the_offenders.exe</code> by putting anywhere the instructions <code>mov rax, 0x1337; cpuid</code> and we break in the CPUID handler in gdb:<pre style=color:#c0c5ce;background-color:#2b303b><code><span>gdb ./mpclient
+</span><span>...
+</span><span>(gdb) r /share/the_offenders.exe
+</span><span>Starting program: /home/ubuntu/fcsc/loadlibrary/mpclient /share/the_offenders.exe
+</span><span>mpclient: large number of extra symbols in engine/mpengine.map, increase MAX_EXTRA_EXPORTS and rebuild: No such process
+</span><span>main(): GDB: add-symbol-file engine/mpengine.dll 0x5a100000+0x1000
+</span><span>main(): GDB: shell bash genmapsym.sh 0x5a100000+0x1000 symbols_1769.o < engine/mpengine.map
+</span><span>main(): GDB: add-symbol-file symbols_1769.o 0
+</span><span>
+</span><span>Program received signal SIGTRAP, Trace/breakpoint trap.
+</span><span>...
+</span><span>
+</span><span>(gdb) b *0x5a100000 + 0x1000 + 0x7c3434
+</span><span>(gdb) display **(uint64_t*)($esi+0x130)
+</span><span>(gdb) continue
+</span></code></pre><p>We can hit continue multiple times until the displayed value becomes the value we've set for <code>rax</code> in <code>the_offenders.exe</code>, being <code>0x1337</code>.<pre style=color:#c0c5ce;background-color:#2b303b><code><span>Continuing.
+</span><span>
+</span><span>Breakpoint 1, 0x5a8c4434 in ?? ()
+</span><span>1: **(uint64_t*)($esi+0x130) = 0x1337
+</span><span>
+</span><span>(gdb) x/10gx *($esi+0x130)
+</span><span>0x5813a328:	0x0000000000001337	0x000000000012f5ec
+</span><span>0x5813a338:	0x0000000140021000	0x0000000000141f30
+</span><span>0x5813a348:	0x000000000012eea0	0x000000000012fff0
+</span><span>0x5813a358:	0x0000000000430000	0x000000000012ff58
+</span><span>0x5813a368:	0x000000000000001d	0x0000000000000000
+</span></code></pre><p>We can confirm we can break at a chosen location in the binary and control the registers data.<h2 id=dumping-the-memory>Dumping the memory</h2><p>All we want is the content of the <code>fingerprint</code> buffer, right before it is being xored.<pre style=color:#c0c5ce;background-color:#2b303b><code><span>0x140001B46    mov     r8d, 1Dh
+</span><span>0x140001B4C    lea     rdx, [rsp+10D8h+fingerprint]
+</span><span>0x140001B54    lea     rcx, [rsp+10D8h+registry_info]
+</span><span>0x140001B5C    call    sub_140002310
+</span><span>0x140001B61    mov     r8d, 1Dh
+</span><span>0x140001B67    lea     rdx, INPUT      ; "INPUTINPUTINPUTINPUTINPUTINPU"
+</span><span>0x140001B6E    lea     rcx, [rsp+10D8h+fingerprint]
+</span><span>0x140001B76    call    xor                                               ; Xor starts here, print the value before
+</span><span>0x140001B7B    mov     r8d, 1Dh
+</span><span>0x140001B81    lea     rdx, tab
+</span><span>0x140001B88    lea     rcx, [rsp+10D8h+fingerprint]
+</span><span>0x140001B90    call    xor
+</span><span>0x140001B95    mov     r8d, 5          ; MaxCount
+</span><span>0x140001B9B    lea     rdx, INPUT      ; "INPUTINPUTINPUTINPUTINPUTINPU"
+</span><span>0x140001BA2    lea     rcx, Str1       ; "FCSC{"
+</span><span>0x140001BA9    call    strncmp
+</span></code></pre><p>We know the <code>fingerprint</code> data will be located in the <code>rcx</code> register if we stop at address <code>0x140001b76</code>, so we can patch there with instructions that will load the content of the buffer at <code>rcx</code> into the various registers to dump the buffer content. It can be done quickly with <a href=https://github.com/rizinorg/rizin>Rizin</a>:<pre style=color:#c0c5ce;background-color:#2b303b><code><span>$ rizin -s 0x140001b76 -w -qc '"wa mov rax, 0x1337; mov rbx, [rcx]; mov rdx, [rcx+8];
+</span><span>mov rdi, [rcx+10]; mov rsi, [rcx+0x18]; cpuid;"; pd 15 @ 0x140001b76-8' the_offenders.exe
+</span><span>            0x140001b6e      lea   rcx, [rsp + 0x730]
+</span><span>            0x140001b76      mov   rax, 0x1337
+</span><span>            0x140001b7d      mov   rbx, qword [rcx]
+</span><span>            0x140001b80      mov   rdx, qword [rcx + 8]
+</span><span>            0x140001b84      mov   rdi, qword [rcx + 0xa]
+</span><span>            0x140001b88      mov   rsi, qword [rcx + 0x18]
+</span><span>            0x140001b8c      cpuid
+</span><span>            0x140001b8e      add   byte [rax], al
+</span><span>            0x140001b90      call  0x1400024a0
+</span><span>            0x140001b95      mov   r8d, 5
+</span><span>            0x140001b9b      lea   rdx, str.INPUTINPUTINPUTINPUTINPUTINPU ; section..data
+</span><span>                                                                       ; 0x140021000 ; "INPUTINPUTINPUTINPUTINPUTINPU"
+</span><span>            0x140001ba2      lea   rcx, str.FCSC                       ; 0x1400163e4 ; "FCSC{"
+</span><span>            0x140001ba9      call  0x140006520
+</span><span>            0x140001bae      test  eax, eax
+</span><span>        ┌─< 0x140001bb0      jne   0x140001c3e
+</span></code></pre><p>The rest of the instructions after CPUID are invalid (i.e. <code>add byte [rax], al</code> won't work as <code>rax</code> which will contain <code>0x1337</code> won't be a valid address) but that's not our concern since we don't continue the emulation after CPUID anyways.<p>We can start over the debugging session, and dump the needed values after our cpuid instruction is reached:<pre style=color:#c0c5ce;background-color:#2b303b><code><span>(gdb) x/10gx *($esi+0x130)
+</span><span>0x5813a328:	0x0000000000001337	0x000000000012f5d0
+</span><span>0x5813a338:	0x0855b177c6dcd598	0xd7008c6d417553ad
+</span><span>0x5813a348:	0x000000000012eea0	0x000000000012fff0
+</span><span>0x5813a358:	0x0000001d7f00323d	0xa4f60855b177c6dc
+</span><span>0x5813a368:	0x000000000000001d	0x0000000000000000
+</span></code></pre><p>Hmm well, it seems hard to understand which value corresponds to what, but with a simple trick we can know which offset represents which register.<pre style=color:#c0c5ce;background-color:#2b303b><code><span>$ rizin -s 0x140001b61 -w -qc '"wa mov rax, 0x1337; mov rbx, 0x4242; mov rcx, 0x4343;
+</span><span>mov rdx, 0x4444; mov rdi, 0x4545; mov rsi, 0x4646; cpuid;"; pd 20 @ 0x140001b6e-18' the_offenders.exe
+</span><span>$ gdb ./mpclient
+</span><span>
+</span><span>...
+</span><span>
+</span><span>(gdb) x/10gx *($esi+0x130)
+</span><span>0x5813a328:	0x0000000000001337	0x0000000000004343
+</span><span>0x5813a338:	0x0000000000004444	0x0000000000004242
+</span><span>0x5813a348:	0x000000000012eea0	0x000000000012fff0
+</span><span>0x5813a358:	0x0000000000004646	0x0000000000004545
+</span><span>0x5813a368:	0x000000000012f840	0x0000000000000000
+</span></code></pre><p>All we have to do now is to build a tiny script to xor everything up, and retrieve the flag:<pre class=language-python data-lang=python style=color:#c0c5ce;background-color:#2b303b><code class=language-python data-lang=python><span style=color:#65737e>#!/usr/bin/env python3
+</span><span>
+</span><span style=color:#b48ead>import </span><span>struct
+</span><span>
+</span><span>p64 = </span><span style=color:#b48ead>lambda </span><span style=color:#bf616a>x</span><span>: struct.</span><span style=color:#bf616a>pack</span><span>('</span><span style=color:#a3be8c>&LTQ</span><span>', x)
+</span><span>
+</span><span style=color:#65737e># Constants in the binary
+</span><span>cve_string = </span><span style=color:#b48ead>b</span><span>'</span><span style=color:#a3be8c>Reminder: patch CVE-2021-1647</span><span>'
+</span><span>constants = [</span><span style=color:#d08770>0xB9</span><span>, </span><span style=color:#d08770>0x75</span><span>, </span><span style=color:#d08770>0x4B</span><span>, </span><span style=color:#d08770>0x6B</span><span>, </span><span style=color:#d08770>0x78</span><span>, </span><span style=color:#d08770>0xA0</span><span>, </span><span style=color:#d08770>0x00</span><span>, </span><span style=color:#d08770>0xC9</span><span>, </span><span style=color:#d08770>0xCE</span><span>, </span><span style=color:#d08770>0x9A</span><span>, </span><span style=color:#d08770>0xEA</span><span>, </span><span style=color:#d08770>0xD5</span><span>, </span><span style=color:#d08770>0x6C</span><span>, </span><span style=color:#d08770>0xBF</span><span>, </span><span style=color:#d08770>0x78</span><span>, </span><span style=color:#d08770>0x45</span><span>, </span><span style=color:#d08770>0xC0</span><span>, </span><span style=color:#d08770>0x9E</span><span>, </span><span style=color:#d08770>0xE4</span><span>, </span><span style=color:#d08770>0x7C</span><span>, </span><span style=color:#d08770>0xED</span><span>, </span><span style=color:#d08770>0xCE</span><span>, </span><span style=color:#d08770>0x39</span><span>, </span><span style=color:#d08770>0x46</span><span>, </span><span style=color:#d08770>0x62</span><span>, </span><span style=color:#d08770>0x6F</span><span>, </span><span style=color:#d08770>0x52</span><span>, </span><span style=color:#d08770>0x6A</span><span>, </span><span style=color:#d08770>0x57</span><span>]
+</span><span style=color:#65737e># Dumped data from gdb
+</span><span>buf = </span><span style=color:#bf616a>p64</span><span>(</span><span style=color:#d08770>0xd7008c6d417553ad</span><span>) + </span><span style=color:#bf616a>p64</span><span>(</span><span style=color:#d08770>0x0855b177c6dcd598</span><span>) + </span><span style=color:#bf616a>p64</span><span>(</span><span style=color:#d08770>0x185c9aba25c0a4f6</span><span>) + </span><span style=color:#bf616a>p64</span><span>(</span><span style=color:#d08770>0x0000001d7f00323d</span><span>)
+</span><span>
+</span><span>x = </span><span style=color:#bf616a>bytearray</span><span>(</span><span style=color:#d08770>0x1d</span><span>)
+</span><span style=color:#b48ead>for </span><span>i </span><span style=color:#b48ead>in </span><span style=color:#96b5b4>range</span><span>(</span><span style=color:#d08770>0x1d</span><span>):
+</span><span>    x[i] = cve_string[i] ^ constants[i] ^ buf[i]
+</span><span style=color:#96b5b4>print</span><span>(x.</span><span style=color:#bf616a>decode</span><span>())
+</span></code></pre><pre style=color:#c0c5ce;background-color:#2b303b><code><span>$ python3 offenders.py
+</span><span>FCSC{HelloFromEmulatedWorld!}
+</span></code></pre><p>That's it!<h2 id=conclusion>Conclusion</h2><p>The challenge was very fun and I learned a lot about Windows Defender even though this writeup is mostly about getting a quick win. There are many different ways of solving it and I hope you enjoyed this one :-)<p>Special thanks to the challenge author and the FCSC organisation team!</div></main><footer>2024 - Antide Petit aka <a href=https://xarkes.com>xarkes</a> - <a href=https://creativecommons.org/licenses/by-sa/4.0/>CC-BY-SA</a> - Made with ❤️</footer>

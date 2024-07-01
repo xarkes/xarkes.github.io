@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+    <channel>
+      <title></title>
+      <link>https://xarkes.com</link>
+      <description></description>
+      <generator>Zola</generator>
+      <language>en</language>
+      <atom:link href="https://xarkes.com/rss.xml" rel="self" type="application/rss+xml"/>
+      <lastBuildDate>Sun, 30 Jun 2024 00:00:00 +0000</lastBuildDate>
+      <item>
+          <title>Bitwarden code review</title>
+          <pubDate>Sun, 30 Jun 2024 00:00:00 +0000</pubDate>
+          <author>Unknown</author>
+          <link>https://xarkes.com/b/bitwarden-code-review/</link>
+          <guid>https://xarkes.com/b/bitwarden-code-review/</guid>
+          <description xml:base="https://xarkes.com/b/bitwarden-code-review/">&lt;p&gt;Since a few months I am using &lt;a href=&quot;https:&#x2F;&#x2F;bitwarden.com&#x2F;&quot;&gt;Bitwarden&lt;&#x2F;a&gt; as my password manager. The main reason I started using it was that I wanted an easy way to keep my passwords synchronised, which local password managers like &lt;a href=&quot;https:&#x2F;&#x2F;keepassxc.org&#x2F;&quot;&gt;KeePassXC&lt;&#x2F;a&gt; do not provide. You end up having to implement your own synchronization mechanism for instance storing the database file in a cloud synchronised folder like &lt;a href=&quot;https:&#x2F;&#x2F;en.wikipedia.org&#x2F;wiki&#x2F;Google_Drive&quot;&gt;Google Drive&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;www.dropbox.com&#x2F;&quot;&gt;DropBox&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;nextcloud.com&#x2F;&quot;&gt;NextCloud&lt;&#x2F;a&gt;, etc.&lt;&#x2F;p&gt;
+&lt;p&gt;Another reason is that Bitwarden is open-source and can be self-hosted, and since I enjoy &lt;del&gt;losing time&lt;&#x2F;del&gt; configuring my own infrastructure and wondering when my hard drive will die and if I made enough backups, I decided to use it for the past months.&lt;&#x2F;p&gt;
+&lt;p&gt;I never took a glance at the implementation of Bitwarden but as my personal laptop is still my 9 year-old Lenovo X250, things around me are sometimes a bit laggy. I like when things are fast (when it comes to computers obviously) and the UIs I use responsive (as in fast). My current annoyances when it comes to the official Bitwarden client are the following:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;It&#x27;s not very fast ie. when starting the process I have to wait ~5 seconds before being prompted for my password (I solely blame the desktop client to be a &lt;a href=&quot;https:&#x2F;&#x2F;www.chromium.org&#x2F;chromium-projects&#x2F;&quot;&gt;Chromium&lt;&#x2F;a&gt; browser running a JavaScript app)&lt;&#x2F;li&gt;
+&lt;li&gt;Navigation is not so easy with a keyboard only&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;When searching for an alternative desktop client on the web I found that some people were asking for it but there is actually none available. As an exercise and because I was wondering about the required effort to write a similar App using no web technologies, I started to dig into the source code in order to make a prototype implementation.&lt;&#x2F;p&gt;
+</description>
+      </item>
+      <item>
+          <title>Coding and watching a series on one screen</title>
+          <pubDate>Sun, 02 Jun 2024 00:00:00 +0000</pubDate>
+          <author>Unknown</author>
+          <link>https://xarkes.com/b/coding-while-watching-on-one-screen/</link>
+          <guid>https://xarkes.com/b/coding-while-watching-on-one-screen/</guid>
+          <description xml:base="https://xarkes.com/b/coding-while-watching-on-one-screen/">&lt;p&gt;Unfortunately, things don&#x27;t always go as planned. I started this sci-fi TV show, and couldn&#x27;t help but prefer watching it over doing some more productive things.
+The good thing is that although the content of the show is getting less interesting and slower, I started feeling like I was spending 50 minutes watching episodes only to get
+10 minutes of actual content, ending up on a &lt;a href=&quot;https:&#x2F;&#x2F;en.wikipedia.org&#x2F;wiki&#x2F;Cliffhanger&quot;&gt;cliffhanger&lt;&#x2F;a&gt; and willing to jump into the next one.&lt;&#x2F;p&gt;
+&lt;p&gt;I immediately thought I could code while watching the TV show, however my current situation involves only my laptop screen so it&#x27;s tough to multitask.
+So what about showing my code on top of the video?&lt;&#x2F;p&gt;
+</description>
+      </item>
+      <item>
+          <title>Avoiding TLS certificate leakage with Nginx</title>
+          <pubDate>Wed, 06 Mar 2024 00:00:00 +0000</pubDate>
+          <author>Unknown</author>
+          <link>https://xarkes.com/b/nginx-tls-certificate-leakage/</link>
+          <guid>https://xarkes.com/b/nginx-tls-certificate-leakage/</guid>
+          <description xml:base="https://xarkes.com/b/nginx-tls-certificate-leakage/">&lt;p&gt;TL;DR: Having a Nginx configuration file with &lt;code&gt;server_name _;&lt;&#x2F;code&gt; is not enough for it to match any not supported domain name. Always properly configure a fallback method with a self-signed certificate not leaking any personal data and make sure it is loaded first as the loading order of configuration files matters. For instance move it to &lt;code&gt;&#x2F;etc&#x2F;nginx&#x2F;sites-enabled&#x2F;0_default&lt;&#x2F;code&gt; and make sure no other server block configuration is loaded first.&lt;&#x2F;p&gt;
+</description>
+      </item>
+      <item>
+          <title>Pwn2Own Austin 2021 - Defeating the Netgear R6700v3</title>
+          <pubDate>Sun, 03 Apr 2022 00:00:00 +0000</pubDate>
+          <author>Unknown</author>
+          <link>https://xarkes.com/b/pwn2own-2021-netgear/</link>
+          <guid>https://xarkes.com/b/pwn2own-2021-netgear/</guid>
+          <description xml:base="https://xarkes.com/b/pwn2own-2021-netgear/">&lt;p&gt;Pwn2Own is a famous computer hacking contest which helds twice a year. It provides various targets for which hackers compete in order to hack them and get unprivileged access to it. It may feature industrial devices, routers, printers, smartphones or even cars and targets change for each event.&lt;&#x2F;p&gt;
+&lt;p&gt;With a coworker of mine we took a glance at the Netgear R6700v3 and this blogpost is a quick recap on what we did. You can read our complete writeup &lt;a href=&quot;https:&#x2F;&#x2F;www.synacktiv.com&#x2F;publications&#x2F;pwn2own-austin-2021-defeating-the-netgear-r6700v3.html&quot;&gt;here&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+</description>
+      </item>
+      <item>
+          <title>SSTIC 2021 - Challenge writeup</title>
+          <pubDate>Tue, 08 Jun 2021 00:00:00 +0000</pubDate>
+          <author>Unknown</author>
+          <link>https://xarkes.com/b/sstic-2021-challenge/</link>
+          <guid>https://xarkes.com/b/sstic-2021-challenge/</guid>
+          <description xml:base="https://xarkes.com/b/sstic-2021-challenge/">&lt;p&gt;Last month of April I also gave a shot to the &lt;a href=&quot;https:&#x2F;&#x2F;www.sstic.org&#x2F;2021&#x2F;challenge&#x2F;&quot;&gt;SSTIC challenge&lt;&#x2F;a&gt;.
+It was very painful and amongst 150 participants and over 1600 downloads, I managed to finish 4&lt;sup&gt;th&lt;&#x2F;sup&gt; in the speed ranking with only 12
+people managing to complete the challenge.
+My solution (in French) can be found &lt;a href=&quot;https:&#x2F;&#x2F;static.sstic.org&#x2F;challenge2021&#x2F;solutions&#x2F;04_Antide_Petit.pdf&quot;&gt;here&lt;&#x2F;a&gt; but as this year was the first
+time the challenge was open internationally, two solutions are available in English (the ones of Robert Xiao and ZetaTwo).&lt;&#x2F;p&gt;
+</description>
+      </item>
+      <item>
+          <title>Fetching GitHub pull requests with git</title>
+          <pubDate>Wed, 02 Jun 2021 00:00:00 +0000</pubDate>
+          <author>Unknown</author>
+          <link>https://xarkes.com/b/git-fetching-github-pull-requests/</link>
+          <guid>https://xarkes.com/b/git-fetching-github-pull-requests/</guid>
+          <description xml:base="https://xarkes.com/b/git-fetching-github-pull-requests/">&lt;p&gt;I often need to fetch a pending Pull Request (PR) from GitHub in order to try a project locally before merging the PR, and although I manage
+to find the commands in my history, I never remember the commands.&lt;&#x2F;p&gt;
+&lt;p&gt;It&#x27;s rather simple, given that the remote named &lt;code&gt;origin&lt;&#x2F;code&gt; is the one from GitHub, &lt;code&gt;1234&lt;&#x2F;code&gt; is your PR number (from GitHub URL, or PR title) and that
+you want to fetch it under a branch named &lt;code&gt;custom_feature&lt;&#x2F;code&gt;:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;git fetch origin pull&#x2F;1234&#x2F;head:custom_feature
+&lt;&#x2F;span&gt;&lt;span&gt;git checkout custom_feature
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;I hope I&#x27;ll remember now!&lt;&#x2F;p&gt;
+</description>
+      </item>
+      <item>
+          <title>DEFCON quals 2021 - Exploit for dummies challenge writeup</title>
+          <pubDate>Mon, 10 May 2021 00:00:00 +0000</pubDate>
+          <author>Unknown</author>
+          <link>https://xarkes.com/b/defcon-quals-2021-exploit-for-dummies/</link>
+          <guid>https://xarkes.com/b/defcon-quals-2021-exploit-for-dummies/</guid>
+          <description xml:base="https://xarkes.com/b/defcon-quals-2021-exploit-for-dummies/">&lt;p&gt;Around 10 days ago was &lt;a href=&quot;https:&#x2F;&#x2F;oooverflow.io&#x2F;dc-ctf-2021-quals&#x2F;&quot;&gt;DEFCON qualifiers&lt;&#x2F;a&gt; and I had a chance to take a look at the challenges.
+My eyes stopped on &quot;Exploit for dummies&quot; as I recognised myself in the term &quot;dummy&quot; and hoped I could solve this one.&lt;&#x2F;p&gt;
+&lt;p&gt;The challenge was marked as &quot;shellcoding&quot; and believe it or not it will deal with &lt;a href=&quot;https:&#x2F;&#x2F;en.wikipedia.org&#x2F;wiki&#x2F;DWARF&quot;&gt;DWARF&lt;&#x2F;a&gt; debugging data format.&lt;&#x2F;p&gt;
+</description>
+      </item>
+      <item>
+          <title>FCSC 2021 - The Offenders reverse engineering challenge writeup</title>
+          <pubDate>Mon, 03 May 2021 00:00:00 +0000</pubDate>
+          <author>Unknown</author>
+          <link>https://xarkes.com/b/fcsc-2021-the-offenders/</link>
+          <guid>https://xarkes.com/b/fcsc-2021-the-offenders/</guid>
+          <description xml:base="https://xarkes.com/b/fcsc-2021-the-offenders/">&lt;p&gt;In the context of the &lt;a href=&quot;https:&#x2F;&#x2F;ecsc.eu&#x2F;&quot;&gt;European Cyber Security Challenge&lt;&#x2F;a&gt; the &lt;a href=&quot;https:&#x2F;&#x2F;en.wikipedia.org&#x2F;wiki&#x2F;Agence_nationale_de_la_s%C3%A9curit%C3%A9_des_syst%C3%A8mes_d%27information&quot;&gt;ANSSI&lt;&#x2F;a&gt; organised qualifications named &lt;a href=&quot;https:&#x2F;&#x2F;france-cybersecurity-challenge.fr&#x2F;&quot;&gt;FCSC&lt;&#x2F;a&gt; in order to select the team that would represent France.
+I managed to take a look at some challenges, in particular &quot;The Offenders&quot; which deals about Windows Defender.
+This writeup will show my quick and dirty way of solving it.&lt;&#x2F;p&gt;
+</description>
+      </item>
+      <item>
+          <title>Making an in-game Lineage 2 Bot</title>
+          <pubDate>Wed, 30 Dec 2020 00:00:00 +0000</pubDate>
+          <author>Unknown</author>
+          <link>https://xarkes.com/b/making-a-lineage-2-bot/</link>
+          <guid>https://xarkes.com/b/making-a-lineage-2-bot/</guid>
+          <description xml:base="https://xarkes.com/b/making-a-lineage-2-bot/">&lt;p&gt;A few months ago I got nostalgic and wanted to try again a little bit of Lineage 2.
+In the past most servers were filled with tons of bots that would farm
+in order to either level up, gain money or loot materials useful for crafting equipment.&lt;&#x2F;p&gt;
+&lt;p&gt;The working and available bots are all non-free (to my knowledge) and most of them are detected by the remote servers as cheating tools!&lt;&#x2F;p&gt;
+&lt;p&gt;So I decided to make my own bot as I thought the process would be interesting.
+This blog post presents my approach at making my own bot for Lineage II.&lt;&#x2F;p&gt;
+</description>
+      </item>
+      <item>
+          <title>SSTIC 2020 - Challenge writeup</title>
+          <pubDate>Fri, 12 Jun 2020 00:00:00 +0000</pubDate>
+          <author>Unknown</author>
+          <link>https://xarkes.com/b/sstic-2020-challenge/</link>
+          <guid>https://xarkes.com/b/sstic-2020-challenge/</guid>
+          <description xml:base="https://xarkes.com/b/sstic-2020-challenge/">&lt;p&gt;During the month of April I tried to solve the SSTIC challenge.
+I managed to complete it eventually, and you can find my solution in French &lt;a href=&quot;https:&#x2F;&#x2F;static.sstic.org&#x2F;challenge2020&#x2F;solutions&#x2F;10_Antide_Petit.pdf.zip&quot;&gt;here&lt;&#x2F;a&gt; (password: sstic2020).&lt;&#x2F;p&gt;
+</description>
+      </item>
+      <item>
+          <title>Advent 2019 - Genetic Mutation challenge writeup (First Blood)</title>
+          <pubDate>Thu, 26 Dec 2019 00:00:00 +0000</pubDate>
+          <author>Unknown</author>
+          <link>https://xarkes.com/b/advent-2019-genetic-mutation-first-blood/</link>
+          <guid>https://xarkes.com/b/advent-2019-genetic-mutation-first-blood/</guid>
+          <description xml:base="https://xarkes.com/b/advent-2019-genetic-mutation-first-blood/">&lt;p&gt;This month, I took a glance at &lt;a href=&quot;https:&#x2F;&#x2F;overthewire.org&quot;&gt;Over The Wire&lt;&#x2F;a&gt;
+&lt;a href=&quot;https:&#x2F;&#x2F;advent2019.overthewire.org&quot;&gt;advent CTF&lt;&#x2F;a&gt;
+with some of my teammates of &lt;a href=&quot;https:&#x2F;&#x2F;securimag.org&quot;&gt;Securimag&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;The challenge was asking for at most 4 bytes to patch and I found it sufficient
+to exploit not the binary itself but rather the &lt;code&gt;exec&lt;&#x2F;code&gt; function. I don&#x27;t know
+if that was the intended way, but it was quick enough to pop a shell and get the
+first blood.&lt;&#x2F;p&gt;
+</description>
+      </item>
+      <item>
+          <title>Hack.lu 2019 - Baby Kernel 2 challenge writeup</title>
+          <pubDate>Mon, 09 Dec 2019 00:00:00 +0000</pubDate>
+          <author>Unknown</author>
+          <link>https://xarkes.com/b/hacklu-2019-babykernel-wu/</link>
+          <guid>https://xarkes.com/b/hacklu-2019-babykernel-wu/</guid>
+          <description xml:base="https://xarkes.com/b/hacklu-2019-babykernel-wu/">&lt;p&gt;Last october, I participated to &lt;a href=&quot;https:&#x2F;&#x2F;2019.hack.lu&#x2F;&quot;&gt;Hack.lu&lt;&#x2F;a&gt; Capture The Flag with my team
+&lt;a href=&quot;https:&#x2F;&#x2F;securimag.org&#x2F;&quot;&gt;Securimag&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;I did this writeup as all the ones I&#x27;ve read do not explain how they managed to reliably find the offset of &lt;code&gt;real_cred&lt;&#x2F;code&gt; in the &lt;code&gt;current_task&lt;&#x2F;code&gt; structure.&lt;&#x2F;p&gt;
+</description>
+      </item>
+    </channel>
+</rss>

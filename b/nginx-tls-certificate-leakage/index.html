@@ -1,0 +1,114 @@
+<!doctype html><html lang=en><head><title>Avoiding TLS certificate leakage with Nginx</title><meta charset=UTF-8><meta content="width=device-width,initial-scale=1.0" name=viewport><link href=/fonts.css rel=stylesheet><link href=/style.css rel=stylesheet><body><main><nav><ul><li><a href=/>/index</a><li><a href=/b/>/blog</a><li><a href=https://github.com/xarkes>/github</a><li><a href=https://x.com/xarkes_>/x</a></ul></nav><div><h1>Avoiding TLS certificate leakage with Nginx</h1><p><strong>Published on 2024-03-06</strong><p>TL;DR: Having a Nginx configuration file with <code>server_name _;</code> is not enough for it to match any not supported domain name. Always properly configure a fallback method with a self-signed certificate not leaking any personal data and make sure it is loaded first as the loading order of configuration files matters. For instance move it to <code>/etc/nginx/sites-enabled/0_default</code> and make sure no other server block configuration is loaded first.</p><span id=continue-reading></span><h2 id=context>Context</h2><p>I recently installed a server with a wildcard certificate in order to host some services. The wildcard certificate is useful in order to only have one renewal to do for all your subdomains, but it is also useful if you have privacy concerns about your services. Indeed, each certificate request is logged for the sake of transparency and trust of certificate chain and thus it results in leaking <code>yoursecretsubdomain.myhome.com</code> . This is well-known from pentesters as it often leads to widening the attack surface when trying to reach into a network. Check out some of Google domains requests: <a href="https://crt.sh/?q=%25.google.com">https://crt.sh/?q=%25.google.com</a> Back to the topic, I was happy running my super leet secret service (aka my IP camera) when it suddenly occurred to me: what if someone tries to reach my server without knowing my domain name at all? Answer given by curl:<pre class=language-text data-lang=text style=color:#c0c5ce;background-color:#2b303b><code class=language-text data-lang=text><span>$ curl -v -k https://10.10.10.10
+</span><span>*   Trying 10.10.10.10:443...
+</span><span>* Connected to 10.10.10.10 (10.10.10.10) port 443
+</span><span>* ALPN: curl offers h2,http/1.1
+</span><span>* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+</span><span>* TLSv1.3 (IN), TLS handshake, Server hello (2):
+</span><span>* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+</span><span>* TLSv1.3 (IN), TLS handshake, Certificate (11):
+</span><span>* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+</span><span>* TLSv1.3 (IN), TLS handshake, Finished (20):
+</span><span>* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+</span><span>* TLSv1.3 (OUT), TLS handshake, Finished (20):
+</span><span>* SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384 / x25519 / id-ecPublicKey
+</span><span>* ALPN: server accepted h2
+</span><span>* Server certificate:
+</span><span>*  subject: CN=*.myhome.com
+</span><span>*  start date: Jan  1 10:30:40 2000 GMT
+</span><span>*  expire date: Jan  1 10:30:40 3000 GMT
+</span><span>*  issuer: C=US; O=Let's Encrypt; CN=R3
+</span><span>*  SSL certificate verify result: unable to get local issuer certificate (20), continuing anyway.
+</span><span>*   Certificate level 0: Public key type EC/prime256v1 (256/128 Bits/secBits), signed using sha256WithRSAEncryption
+</span><span>*   Certificate level 1: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption
+</span><span>*   Certificate level 2: Public key type RSA (4096/152 Bits/secBits), signed using sha256WithRSAEncryption
+</span><span>* using HTTP/2
+</span><span>* [HTTP/2] [1] OPENED stream for https://10.10.10.10/
+</span><span>* [HTTP/2] [1] [:method: GET]
+</span><span>* [HTTP/2] [1] [:scheme: https]
+</span><span>* [HTTP/2] [1] [:authority: 10.10.10.10]
+</span><span>* [HTTP/2] [1] [:path: /]
+</span><span>* [HTTP/2] [1] [user-agent: curl/8.6.0]
+</span><span>* [HTTP/2] [1] [accept: */*]
+</span><span>> GET / HTTP/2
+</span><span>> Host: 10.10.10.10
+</span><span>> User-Agent: curl/8.6.0
+</span><span>> Accept: */*
+</span><span>>
+</span><span>* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+</span><span>* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+</span><span>* old SSL session ID is stale, removing
+</span><span>< HTTP/2 401
+</span><span>< server: nginx/1.22.1
+</span><span>< date: Wed, 06 Mar 2024 19:54:38 GMT
+</span><span>< content-type: text/html
+</span><span>< content-length: 179
+</span><span>< www-authenticate: Basic realm="My IP Camera"
+</span><span><
+</span><span>&LThtml>
+</span><span>&LThead>&LTtitle>401 Authorization Required&LT/title>&LT/head>
+</span><span>&LTbody>
+</span><span>&LTcenter>&LTh1>401 Authorization Required&LT/h1>&LT/center>
+</span><span>&LThr>&LTcenter>nginx/1.22.1&LT/center>
+</span><span>&LT/body>
+</span><span>&LT/html>
+</span></code></pre><p>So here we are, Nginx happily leaks my certificate. How could this happen since I have a fallback method? Stupidly enough, I store my Nginx configuration files in <code>/etc/nginx/sites-enabled</code> and did have a fallback method in <code>/etc/nginx/sites-enabled/default</code>. This particular rule that we see comes from one of the subdomain being stored in <code>/etc/nginx/sites-enabled/abracadabra.myhome.com</code> which is loaded <em>before</em> the default handler.<pre class=language-text data-lang=text style=color:#c0c5ce;background-color:#2b303b><code class=language-text data-lang=text><span>root@server:~# ls /etc/nginx/sites-enabled/ -l
+</span><span>total 16
+</span><span>-rw-r--r-- 1 root root 2465 Mar  5 18:34 abracdabra.myhome.com
+</span><span>-rw-r--r-- 1 root root  337 Mar  5 18:45 default
+</span><span>-rw-r--r-- 1 root root 5788 Mar  5 18:49 secret.myhome.com
+</span></code></pre><p>Although the <code>default</code> configuration file matches every domain name (with a <code>server_name _;</code> directive), in this specific case Nginx will use the first suitable server block, which leads into leaking my certificate from the first configuration file (as well as the service running behind it).<h2 id=solution>Solution</h2><p>I came up with an easy but radical solution:<ul><li>Create a self-signed certificate: <code>openssl req -nodes -new -x509 -days 3650 -subj "/OU= /CN= " -keyout /etc/nginx/blackhole_key.pem -out /etc/nginx/blackhole_cert.pem</code><li>Configure properly the fallback in your nginx configuration:</ul><pre class=language-text data-lang=text style=color:#c0c5ce;background-color:#2b303b><code class=language-text data-lang=text><span># Whatever configuration you may have
+</span><span>#server {
+</span><span>#    listen 10.20.30.1:80;
+</span><span>#    server_name _;
+</span><span>#    return 301 https://$host$request_uri;
+</span><span>#}
+</span><span>
+</span><span># Interface exposed on the internet
+</span><span>server {
+</span><span>    listen 192.168.1.79:443 ssl http2;
+</span><span>    server_name _;
+</span><span>    ssl_certificate     /etc/nginx/blackhole_cert.pem;
+</span><span>    ssl_certificate_key /etc/nginx/blackhole_key.pem;
+</span><span>    return 444;
+</span><span>}
+</span></code></pre><ul><li>Make sure it is loaded first, for instance naming the file <code>0_default</code> or storing this configuration in <code>/etc/nginx/nginx.conf</code>.</ul><p>After restarting Nginx, the magic happens:<pre class=language-text data-lang=text style=color:#c0c5ce;background-color:#2b303b><code class=language-text data-lang=text><span>$ curl -v -k https://10.10.10.10
+</span><span>*   Trying 10.10.10.10:443...
+</span><span>* Connected to 10.10.10.10 (10.10.10.10) port 443
+</span><span>* ALPN: curl offers h2,http/1.1
+</span><span>* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+</span><span>* TLSv1.3 (IN), TLS handshake, Server hello (2):
+</span><span>* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+</span><span>* TLSv1.3 (IN), TLS handshake, Certificate (11):
+</span><span>* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+</span><span>* TLSv1.3 (IN), TLS handshake, Finished (20):
+</span><span>* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+</span><span>* TLSv1.3 (OUT), TLS handshake, Finished (20):
+</span><span>* SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384 / x25519 / RSASSA-PSS
+</span><span>* ALPN: server accepted h2
+</span><span>* Server certificate:
+</span><span>*  subject: OU=No SNI provided; please fix your client.; CN=invalid2.invalid
+</span><span>*  start date: Mar  6 09:48:01 2024 GMT
+</span><span>*  expire date: Mar  4 09:48:01 2034 GMT
+</span><span>*  issuer: OU=No SNI provided; please fix your client.; CN=invalid2.invalid
+</span><span>*  SSL certificate verify result: self-signed certificate (18), continuing anyway.
+</span><span>*   Certificate level 0: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption
+</span><span>* using HTTP/2
+</span><span>* [HTTP/2] [1] OPENED stream for https://10.10.10.10/
+</span><span>* [HTTP/2] [1] [:method: GET]
+</span><span>* [HTTP/2] [1] [:scheme: https]
+</span><span>* [HTTP/2] [1] [:authority: 10.10.10.10]
+</span><span>* [HTTP/2] [1] [:path: /]
+</span><span>* [HTTP/2] [1] [user-agent: curl/8.6.0]
+</span><span>* [HTTP/2] [1] [accept: */*]
+</span><span>> GET / HTTP/2
+</span><span>> Host: 10.10.10.10
+</span><span>> User-Agent: curl/8.6.0
+</span><span>> Accept: */*
+</span><span>>
+</span><span>* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+</span><span>* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+</span><span>* old SSL session ID is stale, removing
+</span><span>* HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)
+</span><span>* Connection #0 to host 10.10.10.10 left intact
+</span><span>curl: (92) HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)
+</span></code></pre><h2 id=conclusion>Conclusion</h2><p>In the end I completely failed my opsec as my wildcard certificate got leaked on <a href="https://www.shodan.io/search?query=ssl.cert.subject.cn%3A.com+-HTTP">Shodan</a> (among other scanners) but hopefully this blogpost will help someone double check their proxy configuration. Always properly configure a fallback method with a self-signed certificate not leaking any personal data and make sure it is loaded first as the loading order of configuration files matters.</div></main><footer>2024 - Antide Petit aka <a href=https://xarkes.com>xarkes</a> - <a href=https://creativecommons.org/licenses/by-sa/4.0/>CC-BY-SA</a> - Made with ❤️</footer>
